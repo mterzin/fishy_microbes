@@ -2,7 +2,7 @@
 
 This repository contains the code for the statistical analysis, machine learning, and integration of microbial and environmental data for the manuscript:
 
-> **Title:** Seawater microbial indicators of reef protection on the Great Barrier Reef
+> **Title:** No-take marine reserves promote oligotrophic reef bacterioplankton communities across the Great Barrier Reef
 > **Authors:** Your Names Here
 > **Status:** Preprint/In Review/Published (link to paper here)
 
@@ -14,10 +14,11 @@ This study investigates the relationship between seawater microbiomes, environme
 
 All primary data used in this analysis are publicly available or available upon request:
 
-*   **Metagenomic Sequences & pMAGs:** Available under EBI BioProject **[PRJEB82623](https://www.ebi.ac.uk/ena/browser/view/PRJEB82623)**.
-*   **Processed pMAGs and Abundance Tables:** Deposited on Zenodo: **[DOI: XXXXXXXX](https://doi.org/XXXXXXX)** (To be activated upon acceptance).
+*   **Metagenomic Sequences**: Available under EBI BioProject **[PRJEB82623](https://www.ebi.ac.uk/ena/browser/view/PRJEB82623)**.
+*   **pMAGs:** Deposited on Zenodo: **[DOI: XXXXXXXX](https://doi.org/XXXXXXX)** (To be activated upon acceptance).
+*   **Processed pMAGs and Abundance Tables:** 
 *   **Physico-chemical Variables:** Available from the IMOS-AODN portal: [Australian Institute of Marine Science (AIMS). (2022). Great Barrier Reef Genomics Database: Seawater Illumina Reads.](https://doi.org/10.25845/Q4XH-YN10)
-*   **Benthic Cover & Fish Data:** Managed by the AIMS Long-Term Monitoring Program (LTMP). Available upon request from: `monitoring@aims.gov.au`.
+*   **Benthic Cover & Fish Data:** Managed by the AIMS Long-Term Monitoring Program (LTMP). Can be accessed via the AIMS data portal (https://apps.aims.gov.au/metadata/view/a17249ab-5316-4396-bb27-29f2d568f727)
 *   **Code for Metagenomic Assembly & Binning:** Described in the companion manuscript: Robbins et al. (2025). "The planktonic microbiome of the Great Barrier Reef".
 
 ## Repository Structure
@@ -56,7 +57,7 @@ The code in this repository replicates the following key analyses:
 - **Random Forest (RF) regression models** to predict continuous environmental variables from microbial abundance data (CLR-transformed). Models were validated using stratified, site-aware repeated train-test splits.
 
 ### 6. Microbial Niche Inference (`06_niche_analysis.R`)
-- Inference of **microbial niche tolerance ranges** (lower bound Q1, optimum Q2, upper bound Q3) for each pMAG against each environmental variable, following the protocol from [Chaffron et al. (2021)](https://doi.org/10.1126/sciadv.abg1921) and the robust optimum (RO) method.
+- Inference of **microbial niche tolerance ranges** (lower bound Q1, optimum Q2, upper bound Q3) for each pMAG against each environmental variable was done using the robust optimum (RO) method, following the protocol from [Chaffron et al. (2021)](https://doi.org/10.1126/sciadv.abg1921).
 
 ## Usage
 
