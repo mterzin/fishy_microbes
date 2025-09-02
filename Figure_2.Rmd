@@ -1,0 +1,1816 @@
+---
+title: "Figure 2"
+subtitle: "R code to replicate the analysis"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+documentclass: article
+mainfont: Lato
+output:
+  html_document:
+    code_folding: show
+    collapse: no
+    df_print: paged
+    fig_caption: yes
+    fig_height: 4
+    fig_width: 4
+    highlight: textmate
+    theme: united
+    toc: yes
+    toc_float: yes
+    css: "/home/marko-terzin/Documents/PhD/Thesis/Chapter_2/Data_analysis/Seawater/testing_Igor_Antti_R_script/All_seawater_full_dataset/resources/ws_style.css"  
+  pdf_document:
+    toc: yes
+    toc_depth: 3
+    number_sections: yes
+    df_print: kable
+    fig_caption: true
+    highlight: zenburn
+    latex_engine: xelatex 
+  word_document:
+#    fig_caption: yes
+#    fig_height: 4
+#    fig_width: 4
+#    highlight: tango
+    toc: yes
+#    toc_depth: 2  
+# bibliography: ../resources/references.bib
+fontsize: 11pt
+geometry: margin=1in
+classoption: a4paper
+abstract: This is the code to for MINT sPLS-DA (and all the supporting analysis) to make Fig. 2 (and the relevant supplementary figures/tables). 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r Loading libraries, results = "hide", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# First checking if I have the packages I need, and installing if not
+list.of.packages <- c("tidyverse", "gplots", "RColorBrewer", "networkD3", "vegan", "rstatix", 
+                      "ggalluvial", "gridExtra", "propr", "patchwork", "phyloseq", "dplyr", 
+                      "VennDiagram", "plyr", "data.table", "vsn", "pheatmap", "ggpubr", 
+                      "microbiome", "rmarkdown", "mixOmics", "NetCoMi", "igraph", "randomForest", 
+                      "caret", "pdp", "rstatix")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+
+# Installing some separately:
+# phyloseq
+# if (!requireNamespace("BiocManager", quietly = TRUE))
+# install.packages("BiocManager")
+
+# BiocManager::install("phyloseq")
+
+# DESeq2
+# BiocManager::install("DESeq2")
+
+# vsn
+# BiocManager::install("vsn")
+
+# Had issues installing tidyverse, so I followed this first (insttalled some dependencies from the terminal) and then it worked: https://community.rstudio.com/t/tidyverse-package-does-not-install/162507/6
+library(tidyverse)
+library(gplots)
+library(RColorBrewer)
+library(ggrepel)
+library(units)
+library(future) # Needed to use multiple processors
+library(furrr) # Needed to use multiple processors
+library(progressr) # to track the progress
+library(networkD3) # for Sankey diagrams
+library(vegan)
+library(rstatix)
+library(parallel) # for setting multiple CPUs
+library(ggalluvial) # to create alluvial diagrams
+library(gridExtra)
+# library(propr) # to compute the proportionality metric!
+library(patchwork)
+library(phyloseq)
+library(ggnewscale)
+library(dplyr)
+library(VennDiagram)
+# if (!require(devtools)) install.packages("devtools")
+# devtools::install_github("gaospecial/ggVennDiagram")
+library(ggVennDiagram)
+library(ggvenn)
+library(plyr) # Needed for the ordination plots I did on my own
+library(data.table) # For data wrangling
+library(vsn) # For normalization
+# library(psych) # Used to investigate correlations among predictors in RDA analysis, ran in vegan
+library(RColorBrewer)
+library(pheatmap)
+library(ggpubr) # has ggarrange
+# EcolUtils by Guillem Salazar
+library(devtools)
+# devtools::install_github("GuillemSalazar/EcolUtils")
+library(EcolUtils)
+# Install pairwiseAdonis
+# devtools::install_github("pmartinezarbizu/pairwiseAdonis/pairwiseAdonis")
+library(pairwiseAdonis)
+# install.packages("remotes")
+# remotes::install_github("microbiome/microbiome")
+library(microbiome)
+# install.packages("rmarkdown")
+library(rmarkdown)
+library(mixOmics)
+# Installing the most important package - mixOmics!
+# Install mixOmics
+# BiocManager::install('mixOmics')
+# library(pairwiseAdonis)
+
+# Installing the NetCoMi package I will need for microbial networks: https://github.com/stefpeschel/NetCoMi
+# install.packages("devtools")
+# install.packages("BiocManager")
+library(doParallel)
+library(foreach)
+# Install NetCoMi
+# devtools::install_github("stefpeschel/NetCoMi", 
+#                         dependencies = c("Depends", "Imports", "LinkingTo"),
+#                         repos = c("https://cloud.r-project.org/",
+#                                   BiocManager::repositories()))
+library(NetCoMi)
+library(igraph) # needed for the function below: read_graph
+# Now installing propr - to compute proportionality metric (microbial networks)
+# devtools::install_github("tpq/propr")
+# library(propr)
+
+# For random forest models:
+library(randomForest)
+library(caret)  # For data splitting and model evaluation
+library(pdp)
+
+# Packages I need for the map:
+library(reshape2) # This is only needed for the melt funtion
+library(reshape)
+library(dplyr)
+library(plyr)
+library(data.table)
+library(ggplot2)
+library(rworldmap)
+library(rworldxtra)
+# library(ggsn)
+library(sf)
+library(raster)
+library(terra)
+# library(rgeos)
+# library(maps)
+# library(maptools)
+library(grid)
+library(miscTools)
+library(stringr)
+library(ggpubr)
+library(plyr)
+library(gridExtra) # for arranging plots
+
+# Loading all the libraries
+library(raster)
+library(phyloseq)
+library(tidyverse)
+library(ggspatial)
+library(ggrepel) # The package ggrepel offers a very flexible approach to deal with label placement (with geom_text_repel and 
+# geom_label_repel), including automated movement of labels in case of overlap
+# Installing AIMS packages individually
+library(remotes) # Needed to install the AIMS R packages below
+# remotes::install_github("https://github.com/open-AIMS/dataaimsr")
+library(dataaimsr)
+# remotes::install_github("https://github.com/open-AIMS/gisaimsr")
+library(gisaimsr)
+library(sp)
+
+# Importing the R object
+load("/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/cleaned_code/Figure_1/Figure_1.RData")
+
+# Setting the work directory
+setwd("/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs")
+```
+
+Importing the metagenomics data
+
+```{r Katherine final abundances on pMAGs, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, results='hide'}
+# Absolute counts
+pMAGs_95ANI <- read.delim("/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/from_Katherine_final_abundances/only_pMAGs/pMAGs.tsv") %>% 
+  column_to_rownames("genome")
+# This is after I partitioned the abundances from Katherine and removed viral contigs (IMOS_V) and mobile
+# elements (IMOS_M) and euk hits (IMOS_E). This should give me 876 pMAGs95ANI, and 190 samples (46 x 4 + 3 reps (Hedley) and 3reps (Davie)). Let's double check
+dim(pMAGs_95ANI)
+# Cleaning column names: Remove "counts." from column names
+colnames(pMAGs_95ANI) <- gsub("count\\.", "", colnames(pMAGs_95ANI))
+
+# Importing the taxa names and MAGs stats:
+pMAGs_95ANI_stats <- read.csv("~/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/from_Katherine_final_abundances/only_pMAGs/Matching_names_876_MAGs_and_5000_dRep.csv")
+# This object will be needed later on when I start plotting genome size, GC and etc. But for the phyloseq object I only need the taxonomy info, so let's select the columns of interest now:
+pMAGs_95ANI_stats_TAX <- pMAGs_95ANI_stats %>% 
+  dplyr::select("Katherine_names_876_bins", "GTDBtk.classification..R214.") %>% 
+  column_to_rownames("Katherine_names_876_bins") %>% 
+  separate(col = "GTDBtk.classification..R214.",
+           into = c("Domain", "Phylum", "Class", "Order", "Family", "Genus", "Species"),
+           sep = ";")
+```
+
+```{r Data Input, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+### Data input ###
+
+# Adding the metadata file!
+# Metadata - where I have average values of WQ and LTMP data
+# I already have it from the read-based analysis, I just made sure (manually!) it corresponds to Yun Kit's naming
+
+# Importing the file I used for random forest models because it doesn't have naS 
+metadata_IMOS_MGD_MAGs <- read.csv("~/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/metadata_for_random_forest_models.csv")
+# metadata_IMOS_MGD_MAGs <- read.csv("~/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/input_data_from_Yun_Kit/metadata_IMOS_MGD_MAGs_Katherine.csv")
+### Important update on 2nd June 2025: modified 21-580 manually to say it's open to fishing. Same modification in MINT_sector_manually_edited.csv
+
+# Now adding the sector information as well
+MINT_sector_manually_edited <- read.csv("~/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/MINT_sector_manually_edited.csv")
+
+# Merging:
+metadata_IMOS_MGD_MAGs <- left_join(metadata_IMOS_MGD_MAGs,
+                                    MINT_sector_manually_edited %>% 
+                                    dplyr::select("Sample_ID", "SECTOR")
+                                    )
+# Adding sector value for two sites where it's missing for some reason...
+# Dor 21-580:
+metadata_IMOS_MGD_MAGs$SECTOR <- ifelse(grepl("21580_", metadata_IMOS_MGD_MAGs$Sample_ID),
+                                        "SW", metadata_IMOS_MGD_MAGs$SECTOR)
+# For St Crispin:
+metadata_IMOS_MGD_MAGs$SECTOR <- ifelse(grepl("stcrispin_", metadata_IMOS_MGD_MAGs$Sample_ID),
+                                        "CA", metadata_IMOS_MGD_MAGs$SECTOR)
+
+# Now adding the WQ medians!
+# WQ_medians_per_reef <- read.csv("~/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/input_data_from_Yun_Kit/metadata_WQ_medians_per_reef.csv")
+# Merging
+# metadata_IMOS_MGD_MAGs <- left_join(metadata_IMOS_MGD_MAGs, WQ_medians_per_reef)
+
+# Merging into a phyloseq object
+OTU = otu_table(pMAGs_95ANI, taxa_are_rows = TRUE)
+TAX = tax_table(as.matrix(pMAGs_95ANI_stats_TAX))
+pMAGs_95ANI_phyloseq <- phyloseq(OTU, TAX)
+
+# Before merging into the same phyloseq object, make sure the Sample IDs in metadata and OTU objects are in the same order
+OTU_Sample_IDs <- as.data.frame(colnames(OTU))
+colnames(OTU_Sample_IDs) <- "Sample_ID"
+# Making sure samples are ordered in the same way
+metadata_IMOS_MGD_MAGs <- left_join(OTU_Sample_IDs, metadata_IMOS_MGD_MAGs)
+
+# Just changing the sectors so that they are ordered from North to South
+# Cape Grenville sector
+# Princess Charlotte Bay sector
+# Cairns sector
+# Innisfail sector
+# Townsville sector
+# Swains sector
+# Capricorn Bunker sector
+
+metadata_IMOS_MGD_MAGs <- metadata_IMOS_MGD_MAGs %>%
+  mutate(SECTOR_N_S = recode(SECTOR,
+                              CG = "01_Cape_Grenville",
+                              PC = "02_Princess_Charlotte_bay",
+                              CA = "03_Cairns",
+                              IN = "04_Innisfail",
+                              TO = "05_Townsville",
+                              SW = "06_Swains",
+                              CB = "07_Capricorn_Bunker"))
+
+# Preparing the metadata to merge with the phyloseq object
+sampledata <- metadata_IMOS_MGD_MAGs
+
+# 1. Ensure we have the exact same samples in both datasets
+otu_samples <- colnames(otu_table(pMAGs_95ANI_phyloseq))
+sampledata <- sampledata %>% 
+  filter(Sample_ID %in% otu_samples) %>% 
+  arrange(match(Sample_ID, otu_samples))
+
+# 2. Verify dimensions match exactly
+if(nrow(sampledata) != length(otu_samples)) {
+  stop(paste("Sample count mismatch: Metadata has", nrow(sampledata),
+             "samples, OTU table has", length(otu_samples)))
+}
+
+# 3. Create sample_data object with proper row names
+sampledata <- sample_data(
+  data.frame(
+    sampledata,
+    row.names = sampledata$Sample_ID,  # Explicit row names
+    stringsAsFactors = FALSE
+  )
+)
+
+# 4. Final validation checks
+print("First 5 sample names in metadata:")
+print(head(rownames(sampledata)))
+print("First 5 sample names in OTU table:")
+print(head(colnames(otu_table(pMAGs_95ANI_phyloseq))))
+
+print("Any NA values in Sample_ID?")
+print(any(is.na(sampledata$Sample_ID)))
+
+if(!validObject(sampledata)) {
+  print("Sample data validation failed. Structure:")
+  str(sampledata)
+  stop("Invalid sample_data object")
+}
+
+# 5. Merge with phyloseq
+pMAGs_95ANI_phyloseq <- merge_phyloseq(pMAGs_95ANI_phyloseq, sampledata)
+```
+
+```{r Preparing for stats - CLR transformation, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, results='hide'}
+### Data Normalisation - Center Log Ratio (CLR) transformation ###
+
+# CLR is the normalisation method suggested by the mixOmics R package for microbial data - a way to address missing values that are characteristic of microbial datasets. I need to remove missing values before doing the CLR normalisation - The geometric mean cannot be determined for sparse data without deleting, replacing or estimating the 0 count values. So I am introducing pseudo counts
+
+### Tutorial used: http://mixomics.org/mixmc/mixmc-preprocessing/
+
+# Checking if there are any zeros - BEFORE adding pseudocounts
+sum(which(pMAGs_95ANI_phyloseq@otu_table == 0))
+# Pseudocounts - replacing all zero vals with 1; 
+pMAGs_95ANI_phyloseq@otu_table <- pMAGs_95ANI_phyloseq@otu_table + 1
+# Checking if there are any zeros - AFTER adding pseudocounts
+sum(which(pMAGs_95ANI_phyloseq@otu_table == 0))
+# All good! No NAs after introducing pseudocounts
+
+### Now I can CLR transform:
+# All data, but the correct thing should be each sector separately
+pMAGs_95ANI_phyloseq_clr <- microbiome::transform(pMAGs_95ANI_phyloseq, transform = "clr")
+
+# CLR within each sector - use this object for MINT:
+# 1. Extract sample data and sectors
+sector_info <- sample_data(pMAGs_95ANI_phyloseq)$SECTOR_N_S
+sectors <- unique(sector_info)
+
+# 2. Initialize an empty list to store CLR-transformed subsets
+phy_clr_list <- list()
+
+# 3. Loop through each sector, apply CLR, and store results
+for (sector in sectors) {
+  # Subset phyloseq by sector
+  phy_subset <- subset_samples(pMAGs_95ANI_phyloseq, SECTOR_N_S == sector)
+  
+  # Apply CLR to the subset (with pseudo-count to avoid zeros)
+  phy_subset_clr <- microbiome::transform(phy_subset, transform = "clr")
+  
+  # Store in list
+  phy_clr_list[[sector]] <- phy_subset_clr
+}
+
+# 4. Merge all sectors back into one phyloseq object
+pMAGs_95ANI_phyloseq_CLR_per_sector <- do.call(merge_phyloseq, phy_clr_list)
+
+# 5. Verify the output
+head(otu_table(pMAGs_95ANI_phyloseq_CLR_per_sector))  # Should show CLR values
+### IMPORTANT: use pMAGs_95ANI_phyloseq_CLR_per_sector only for MINT!!
+```
+
+# What are the main clustering patterns across our samples? ***PCA*** - ***P***rincipal ***C***omponents ***A***nalysis
+
+Principal Components Analysis (PCA) was applied in an R package mixOmics (Rohart et al. 2017b) as an unsupervised approach to visualise the main clustering patterns between reef sites based on microbial community profiles The number of optimal PCA components was determined using the tune.pca() function in mixOmics (Rohart et al. 2017b). 
+
+```{r PCA analysis - looking at the main clustering patterns, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, results='hide'}
+# This is a matrix with OTU counts - raw, with pseudocounts introduced!
+MAGs <- as.data.frame(pMAGs_95ANI_phyloseq_clr@otu_table)
+MAGs <- t(MAGs)
+# Check dimensions of data
+dim(MAGs)
+class(MAGs)
+
+# Minimal code - mixOmics, PCA
+result.pca <- pca(MAGs)
+```
+
+```{r PCA - MAGs, fig.width = 10, fig.height=5, fig.cap="Main clustering patterns of seawater microbial communities. The PCA ordination plots show clear differences between microbial communities sampled during the summer/wet season (red) and winter/dry season (blue), with 50% of variance being attributable to dimension 1. Samples collected in the peak of summer (Trip 3) additionally separate from early summer sampling (Trips 1 and 2) on PCA dimension 2.", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+pca_MAGs_95 <- plotIndiv(result.pca,
+          group = sample_data(pMAGs_95ANI_phyloseq_clr)$Sampling_trip,
+          title = 'PCA | 876 IMOS GBR-MGD MAGs - (95% ANI)',
+          legend = T,
+          ellipse = TRUE,
+          ind.names = F,
+          col.per.group =c("indianred", # Sampling trip 1
+                "indianred4", # Sampling trip 2 
+                "red3", # Sampling trip 3
+                "slateblue"), # Sampling trip 4
+          legend.title = 'Sampling trip'
+          )
+```
+
+```{r Getting the taxa/gene names, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# I will need this later for plotting
+
+# Defining MAG names - full taxonomy
+MAGs.full.name.and.OTU <- left_join(otu_table(pMAGs_95ANI_phyloseq_clr) %>%
+                              as.data.frame %>%
+                              rownames_to_column("OTU"),
+                            tax_table(pMAGs_95ANI_phyloseq_clr) %>%
+                              as.data.frame %>%
+                              rownames_to_column("OTU")) %>%
+  tidyr::unite(taxonomy, c(OTU, Domain, Class, Order, Family, Genus, Species), sep = "; ") # Adding Taxonomy info
+## Joining, by = "OTU"
+MAGs.full.name.and.OTU <- as.character(MAGs.full.name.and.OTU$taxonomy)
+
+# Exporting the names of taxa now, and making them short - easier plotting!
+MAGs.name.short <- left_join(otu_table(pMAGs_95ANI_phyloseq_clr) %>%
+                              as.data.frame %>%
+                              rownames_to_column("OTU"),
+                            tax_table(pMAGs_95ANI_phyloseq_clr) %>%
+                              as.data.frame %>%
+                              rownames_to_column("OTU")) %>%
+  tidyr::unite(taxonomy, c(Class, Order, Family, Genus, Species), sep = "; ") # Adding Taxonomy info
+## Joining, by = "OTU"
+MAGs.name.short <- as.character(MAGs.name.short$taxonomy)
+
+MAGs.name.super.short <- left_join(otu_table(pMAGs_95ANI_phyloseq_clr) %>%
+                              as.data.frame %>%
+                              rownames_to_column("OTU"),
+                            tax_table(pMAGs_95ANI_phyloseq_clr) %>%
+                              as.data.frame %>%
+                              rownames_to_column("OTU")) %>%
+  tidyr::unite(taxonomy, c(Family, Genus, Species), sep = "; ") # Adding Taxonomy info
+## Joining, by = "OTU"
+MAGs.name.super.short <- as.character(MAGs.name.super.short$taxonomy)
+```
+
+# Can we distinguish between no-take and take zones? 
+
+## PCA - coloring based on reef protection
+
+```{r PCA per reef protection status - MAGs, fig.width = 10, fig.height=5, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, results='hide', fig.show='hide'}
+pca_open_closed <- plotIndiv(result.pca,
+          group = sample_data(pMAGs_95ANI_phyloseq_clr)$Open_or_Closed_to_fishing,
+          pch = as.factor(sample_data(pMAGs_95ANI_phyloseq_clr)$SECTOR),
+          title = 'PCA | 876 IMOS-MGD MAGs (95% ANI)',
+          legend = T,
+          ellipse = T,
+          ind.names = F,
+          col.per.group = c("seagreen3", # Closed to fishing
+                            "steelblue4"), # open to fishing
+          legend.title = 'Reef Protection Status'
+          )
+```
+
+PCA on its own does not discriminate between zones, and sites are clustering based on geographic proximity (i.e. sector) and time (i.e. sampling trip). Will (sPLS-DA) improve the separation between zones as a supervised approach?
+
+### Optimal Number of components in PLS-DA
+
+The perf() function evaluates the performance of PLS-DA - i.e., its ability to rightly classify ‘new’ samples into their category (no-take and take zones) using repeated cross-validation. We initially choose a large number of components (here ncomp = 10) and assess the model as we gradually increase the number of components. Here we use 4-fold CV repeated 50 times.
+
+```{r PLS-DA protection status, fig.width = 8, fig.height=5, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+plsda.open.closed <- mixOmics::plsda(X = MAGs,
+                     Y = metadata_IMOS_MGD_MAGs$Open_or_Closed_to_fishing,
+                     ncomp = 10)
+perf.plsda.open.closed <- perf(plsda.open.closed,
+                               validation = 'Mfold',
+                               folds = 4,
+                               progressBar = TRUE,  # Set to TRUE to track progress
+                               nrepeat = 50)         # We suggest nrepeat = 50 (at least)
+```
+
+```{r PLS-DA protection status tuning plot, fig.width = 8, fig.height=5, fig.cap="Tuning the number of components in PLS-DA on the IMOS-MGD MAG data (876 MAGs, drep at 95% ANI). For each component, repeated cross-validation (50 ×4−fold CV) is used to evaluate the PLS-DA classification performance (overall and balanced error rate BER, and for each type of prediction distance: max.dist, centroids.dist and mahalanobis.dist) to discriminate between no-take and take zones based on the seawater microbiome. Bars show the standard deviation across the repeated folds. The plot shows that the error rate keeps dropping as we increase the number of components, but I will retain 2 dimensions in the final PLS-DA model (1) to avoid overfitting, and because (2) I am only aiming to discriminate between two categorical outcomes.", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# Plot
+plot(perf.plsda.open.closed, sd = TRUE, legend.position = 'horizontal')
+```
+
+This is odd because the model keeps adding components, but 1-2 PCs should be enough for two outcomes (categorical).
+
+### Final PLS-DA model
+
+We now run our final PLS-DA model that includes 2 components:
+
+```{r final model PLS-DA protection status, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+final.plsda.open.closed <- mixOmics::plsda(X = MAGs,
+                     Y = metadata_IMOS_MGD_MAGs$Open_or_Closed_to_fishing,
+                     ncomp = 2)
+```
+
+```{r PLS-DA protection status sample plots col per zoning, fig.width = 9, fig.height=5, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+pls.da.open.closed <- plotIndiv(final.plsda.open.closed,
+          ind.names = FALSE,
+          group = sample_data(pMAGs_95ANI_phyloseq_clr)$Open_or_Closed_to_fishing,
+#          pch.levels = sample_data(pMAGs_95ANI_phyloseq_clr)$Sampling_trip,
+          pch = as.factor(sample_data(pMAGs_95ANI_phyloseq_clr)$Sampling_trip),
+          legend=TRUE,
+          col.per.group = c("seagreen3", # Closed to fishing
+                            "steelblue4"), # open to fishing
+          legend.title = 'Reef Protection Status',
+          comp=c(1,2),
+          ellipse = TRUE, 
+          title = 'PLS-DA on IMOS-MGD MAGs (876, 95% ANI derep)',
+#          X.label = 'PLS-DA comp 1',
+#          Y.label = 'PLS-DA comp 2',
+)
+```
+
+```{r PLS-DA protection status sample plots zol per trip, fig.width = 9, fig.height=5, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+pls.da.open.closed <- plotIndiv(final.plsda.open.closed,
+          ind.names = FALSE,
+          group = sample_data(pMAGs_95ANI_phyloseq_clr)$Sampling_trip,
+#          pch.levels = sample_data(pMAGs_95ANI_phyloseq_clr)$Sampling_trip,
+          pch = as.factor(sample_data(pMAGs_95ANI_phyloseq_clr)$Open_or_Closed_to_fishing),
+          legend=TRUE,
+col.per.group =c("indianred", # Sampling trip 1
+                "indianred4", # Sampling trip 2 
+                "red3", # Sampling trip 3
+                "slateblue"), # Sampling trip 4
+          legend.title = 'Sampling trip',
+          comp=c(1,2),
+          ellipse = TRUE, 
+          title = 'PLS-DA on IMOS-MGD MAGs (876, 95% ANI derep)',
+#          X.label = 'PLS-DA comp 1',
+#          Y.label = 'PLS-DA comp 2',
+)
+```
+
+We can observe improved clustering according to reef protection status (top), compared with PCA. This is to be expected since the PLS-DA model includes the class information of each sample, and aims to discriminate between them. From the plotIndiv() function, we observe some discrimination between no-take and take zones mostly on component 1 (x-axis), however we can still see the trip effect (bottom). The axis labels indicate the amount of variation explained per component, however, the interpretation of this amount is ***not*** as important as in PCA, as PLS-DA aims to maximise the covariance between components associated to X (predictor dataset, i.e. the 876 IMOS-MGD MAGs) and Y (categorical "response", i.e. no-take and take zones), rather than the variance of X (done in PCA).
+
+### Classification performance of the final model
+
+We can rerun a more extensive performance evaluation with more repeats for our final model:
+
+```{r PLS-DA protection status assessing the final model, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, results='hide'}
+perf.final.plsda.open.closed <- perf(final.plsda.open.closed,
+                                     validation = 'Mfold',
+                                     folds = 4,
+                                     progressBar = TRUE, # TRUE to track progress
+                                     nrepeat = 50) # we recommend 50 
+```
+
+Numerical outputs of interest include the final overall performance for 2 components (Ballanced error rate, max.dist):
+
+```{r PLS-DA protection status assessing the final model numerical outputs, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+perf.final.plsda.open.closed$error.rate$BER[, 'max.dist']
+```
+
+We can also get the error rate per class across each component:
+
+```{r PLS-DA protection status assessing the final model numerical outputs per class, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+perf.final.plsda.open.closed$error.rate.class$max.dist
+```
+
+## sPLS-DA - can we refine these clusters by selecting the most influential MAGs?
+
+As many of the 876 MAGs in X may be noisy or uninformative to discriminate between no-take and take reefs, an sPLS-DA analysis (sparse variant) may help refine the sample clusters and select a small subset of variables relevant to discriminate each class.
+
+### Tuning the number of variables to select
+
+We estimate the classification error rate with respect to the number of selected variables in the model with the function tune.splsda(). The tuning is being performed one component at a time inside the function and the optimal number of variables to select is automatically retrieved after each component run.
+
+Previously, we determined the optimal number of components to be ncomp = 2 with PLS-DA. Here we set ncomp = 3 to further assess if this would be the case for a sparse model, and use 4-fold cross validation repeated 50 times.
+
+We first define a grid of keepX values. For example here, we define a fine grid at the start, and then specify a coarser, larger sequence of values:
+
+```{r sPLS-DA making a grid of values, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# Grid of possible keepX values that will be tested for each comp
+list.keepX <- c(1:10,  seq(20, 150, 10))
+list.keepX
+```
+
+
+```{r sPLS-DA tuning the number of features, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+tune.splsda.open.closed <- tune.splsda(X = MAGs,
+                                       Y = metadata_IMOS_MGD_MAGs$Open_or_Closed_to_fishing,
+                                       ncomp = 8,
+                                       progressBar = TRUE,
+                                       validation = 'Mfold', 
+                                       folds = 10,
+                                       # dist = 'max.dist',
+                                       test.keepX = list.keepX,
+                                       nrepeat = 50)
+```
+
+The following command line will output the mean error rate for each component and each tested keepX value given the past (tuned) components.
+
+```{r sPLS-DA tuning results as numerical output, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# Just a head of the classification error rate per keepX (in rows) and comp
+head(tune.splsda.open.closed$error.rate)
+```
+
+This output globally shows that the classification error rate continues to decrease after the second component in sparse PLS-DA, however if only discriminating between two categorical outcomes, 1 or 2 components should be kept to avoid overfitting.***
+
+We display the mean classification error rate on each component, bearing in mind that each component is conditional on the previous components calculated with the optimal number of selected variables. The diamond in the figure below indicates the best keepX value to achieve the lowest error rate per component.
+
+```{r sPLS-DA tuning the number of features plot, fig.cap="Tuning keepX for the sPLS-DA performed on the IMOS GBR-MGD MAGs (876 genomes, drep at 95% ANI). Each coloured line represents the balanced error rate (y-axis) per component across all tested keepX values (x-axis) with the standard deviation based on the repeated cross-validation folds. The diamond indicates the optimal keepX value on a particular component which achieves the lowest classification error rate as determined with a one-sided t−test. As sPLS-DA is an iterative algorithm, values represented for a given component (e.g. comp 1 to 2) include the optimal keepX value chosen for the previous component (comp 1).", fig.height=5, fig.width=8, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# To show the error bars across the repeats:
+plot(tune.splsda.open.closed, sd = TRUE)
+```
+
+The tuning results depend on the tuning grid list.keepX, as well as the values chosen for folds and nrepeat. Therefore, we recommend assessing the performance of the final model, as well as examining the stability of the selected variables across the different folds, as detailed in the next section.
+
+The figure above shows that the error rate decreases when more components are included in sPLS-DA. To obtain a more reliable estimation of the error rate, the number of repeats should be increased (between 50 to 100). This type of graph helps not only to choose the ‘optimal’ number of variables to select, but also to confirm the number of components ncomp. From the code below, we can assess that in fact, the addition of a fourth component does not improve the classification (no statistically significant improvement according to a one-sided t−test), hence we can choose ncomp = 3.
+
+```{r sPLS-DA tuning results optimal number of dimensions as numerical output and t-test, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# The optimal number of components according to our one-sided t-tests
+tune.splsda.open.closed$choice.ncomp$ncomp
+```
+
+```{r sPLS-DA tuning results optimal number of MAGs per component, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# The optimal keepX parameter according to minimal error rate
+tune.splsda.open.closed$choice.keepX
+```
+
+### Final sPLS-DA model and performance
+
+Here is our final sPLS-DA model with the optimal number of components and features (keepX) obtained from our tuning step.
+
+```{r sPLS-DA final model open closed, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# Optimal number of components based on t-tests on the error rate
+ncomp <- tune.splsda.open.closed$choice.ncomp$ncomp 
+ncomp
+
+# Optimal number of variables to select
+select.keepX <- tune.splsda.open.closed$choice.keepX[1:ncomp]  
+select.keepX
+
+final.splsda.open.closed <- mixOmics::splsda(X = MAGs,
+                                   Y = metadata_IMOS_MGD_MAGs$Open_or_Closed_to_fishing,
+                                   ncomp = ncomp,
+                                   keepX = select.keepX) 
+# You can choose to skip the tuning step, and input your arbitrarily chosen parameters in the following code (simply specify your own ncomp and keepX values):
+```
+
+The performance of the model with the ncomp and keepX parameters is assessed with the perf() function. We use 4-fold validation (folds = 4), repeated 50 times (nrepeat = 50).
+
+The classification error rates that are output include both the overall error rate, as well as the balanced error rate (BER) when the number of samples per group is not balanced - as is the case in this study.
+
+```{r Checking the performance of the sPLS-DA final model open closed, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, results='hide'}
+perf.final.splsda.open.closed <- perf(final.splsda.open.closed,
+                                      folds = 4,
+                                      validation = "Mfold",
+                                      progressBar = TRUE,
+                                      nrepeat = 50)
+```
+
+```{r Checking the performance of the sPLS-DA final model open closed numerical, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# perf.splsda.srbct  # Lists the different outputs
+perf.final.splsda.open.closed$error.rate
+```
+
+We can also examine the error rate per class:
+
+```{r Checking the performance of the sPLS-DA final model open closed numerical per class, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+perf.final.splsda.open.closed$error.rate.class
+```
+
+These results can be compared with the performance of PLS-DA and show the benefits of variable selection to not only obtain a parsimonious model, but also to improve the classification error rate (overall and per class).
+
+### Variable selection and stability
+
+During the repeated cross-validation process in perf() we can record how often the same variables are selected across the folds. This information is important to answer the question: ***How reproducible is my molecular signature when the training set is perturbed via cross-validation?***
+
+```{r Stability of sPLS-DA features, fig.cap="Stability of variable selection from the sPLS-DA on the IMOS GBR-MGD MAGs data (876 MAGs, drep at 95% ANI). We use a by-product from perf() to assess how often the same MAGs are selected for a given keepX value in the final sPLS-DA model. The barplot represents the frequency of selection across repeated CV folds for each selected gene for component 1 and 2. The MAGs are ranked according to decreasing frequency.", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+par(mfrow=c(1,2))
+# For component 1
+stable.comp1 <- perf.final.splsda.open.closed$features$stable$comp1
+barplot(stable.comp1,
+        xlab = 'variables selected across CV folds', 
+        ylab = 'Stability frequency',
+        main = 'Feature stability for comp = 1')
+
+# For component 2
+stable.comp2 <- perf.final.splsda.open.closed$features$stable$comp2
+barplot(stable.comp2,
+        xlab = 'variables selected across CV folds', 
+        ylab = 'Stability frequency',
+        main = 'Feature stability for comp = 2')
+par(mfrow=c(1,1))
+```
+
+The function selectVar() outputs the variables (pMAGs) selected for a given component and their loading values (ranked in decreasing absolute value). We concatenate those results with the feature stability, as shown here for variables selected on component 1:
+
+```{r Stability sPLS-DA, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# First extract the name of selected var:
+select.name <- selectVar(final.splsda.open.closed, comp = 1)$name
+
+# Then extract the stability values from perf:
+stability <- perf.final.splsda.open.closed$features$stable$comp1[select.name]
+
+# Just the head of the stability of the selected var:
+head(cbind(selectVar(final.splsda.open.closed, comp = 1)$value, stability))
+```
+
+### Sample visualisation
+
+```{r sPLS-DA sample plots separate, fig.cap="Sample plots from the sPLS-DA performed on the IMOS GBR-MGD MAGs data (876 MAGs, drep at 95% ANI). Samples are projected into the space spanned by the first three components. The plots represent 95% ellipse confidence intervals around each sample class (no-take and take zones). The start of each arrow represents the centroid of each class in the space spanned by the components. (a) Components 1 and 2 and (b) Components 2 and 3. Samples are coloured by the reef protection status in green (no-take zones) and blue (take zones). Component 1 discriminates BL vs. the rest, component 2 discriminates EWS vs. the rest, while component 3 further discriminates NB vs. RMS vs. the rest. The combination of all three components enables us to discriminate all classes.", fig.height=5, fig.width=9, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, results='hide', fig.show='hide'}
+# Per reef protection status
+spls.da.open.closed <- plotIndiv(final.splsda.open.closed,
+          comp = c(1,2),
+          ind.names = FALSE,
+          pch = as.factor(sample_data(pMAGs_95ANI_phyloseq_clr)$Sampling_trip),
+          group = sample_data(pMAGs_95ANI_phyloseq_clr)$Open_or_Closed_to_fishing,
+          ellipse = TRUE,
+          legend=TRUE,
+          col.per.group = c("seagreen3", # Closed to fishing
+                            "steelblue4"), # open to fishing
+          legend.title = 'Reef Protection Status',
+#          star = TRUE,
+          title = 'IMOS-MGD MAGs open/closed, sPLS-DA comp 1 - 2')
+# Per trip
+spls.da.open.closed.per.trip <- plotIndiv(final.splsda.open.closed,
+          comp = c(1,2),
+          ind.names = FALSE,
+          pch = as.factor(sample_data(pMAGs_95ANI_phyloseq_clr)$Open_or_Closed_to_fishing),
+          group = sample_data(pMAGs_95ANI_phyloseq_clr)$Sampling_trip,
+          ellipse = TRUE,
+          legend=TRUE,
+          col.per.group =c("indianred", # Sampling trip 1
+                "indianred4", # Sampling trip 2 
+                "red3", # Sampling trip 3
+                "slateblue"), # Sampling trip 4
+          legend.title = 'AIMS-LTMP Sampling transect',
+#          star = TRUE,
+          title = 'IMOS-MGD MAGs open/closed, sPLS-DA comp 1 - 2')
+```
+
+Are these sPLS-DA sample plots different than the PLS-DA plot? They are showing similar patterns - while we do see some clustering between the zones based on selected features, we still see strong spatiotemporal effects as well.
+
+### Variable visualisation
+
+We represent the pMAGs selected with sPLS-DA on the correlation circle plot. Here to increase interpretation, we specify the argument var.names as the first 10 characters of the gene names. We also reduce the size of the font with the argument cex.
+
+```{r sPLS-DA circle plot, fig.height=7, fig.width=7, eval=TRUE, fig.cap="Correlation circle plot representing the MAGs selected by sPLS-DA performed on the 876 IMOS GBR-MGD MAGs (drep at 95% ANI). MAG names are truncated, and we only show the MAGs selected by sPLS-DA in components 1 and 2. This graphic should be interpreted in conjunction with the sample plot.", message = FALSE, warning=FALSE, echo=TRUE}
+plotVar(final.splsda.open.closed,
+        comp = c(1,2), 
+        var.names = list(MAGs.name.super.short),
+        cex = 3)
+```
+
+By considering both the correlation circle plot and the sample plot, we observe that a group of pMAGs with a positive correlation with component 1 (‘EH domain’, ‘proteasome’ etc.) are associated with the BL samples. We also observe two groups of genes either positively or negatively correlated with component 2. These genes are likely to characterise either the NB + RMS classes, or the EWS class.
+
+This interpretation can be further examined with the plotLoadings() function. In this plot, the loading weights of each selected variable on each component are represented. The colours indicate the group in which the expression of the selected pMAGs is maximal based on the mean (method = 'median' is also available for skewed data). For example on component 1:
+
+```{r sPLS-DA loading plots, fig.height=7, fig.width=7, eval=TRUE, fig.cap="Loading plot of the MAGs selected by sPLS-DA on component 1 on the 876 IMOS GBR-MGD MAGs. MAGs are ranked according to their loading weight (most important at the bottom to least important at the top), represented as a barplot. Colours indicate the class for which a particular MAGs is maximally enriched, on average, in this particular class (i.e. no-take or take reefs). The plot helps to further characterise the molecular signatures and should be interpreted jointly with the sPLS-DA sample plot.", message = FALSE, warning=FALSE, echo=TRUE}
+plotLoadings(final.splsda.open.closed,
+             comp = 1,
+             method = 'mean',
+             contrib = 'max', 
+             name.var = MAGs.name.super.short)
+```
+
+To complete the visualisation, the CIM in this special case is a simple hierarchical heatmap representing abundance values of the MAGs selected across all components with respect to each sample. Here we use an Euclidean distance with Complete agglomeration method, and we specify the argument row.sideColors to colour the samples according to their sampling trip.
+
+```{r sPLS-DA heatmap col per trips, fig.height=27, fig.width=27, eval=TRUE, fig.cap="Clustered Image Map of the MAGs selected by sPLS-DA on the 876 IMOS GBR-MGD MAGs on the first 2 components. A hierarchical clustering based on the MAG enrichment vales for the selected MAGs, with reef sites in rows coloured according to their reef protection status (and clustered using Euclidean distance with Complete agglomeration method).", message = FALSE, warning=FALSE, echo=TRUE}
+cols.LTMP.trips <- c("indianred", # Sampling trip 1
+                "indianred4", # Sampling trip 2 
+                "red3", # Sampling trip 3
+                "slateblue") # Sampling trip 4
+LTMP.trips.cols <- palette(cols.LTMP.trips)[as.numeric(as.factor(metadata_IMOS_MGD_MAGs$Sampling_trip))]
+
+cols.LTMP.trips <- c("indianred", # Sampling trip 1
+                "indianred4", # Sampling trip 2 
+                "red3", # Sampling trip 3
+                "slateblue") # Sampling trip 4
+LTMP.trips.cols <- palette(cols.LTMP.trips)[as.numeric(as.factor(metadata_IMOS_MGD_MAGs$Sampling_trip))]
+
+cim(final.splsda.open.closed,
+    comp = 1:2,
+#    cutoff = 0.95,
+    col.names = MAGs.name.short,
+    margins=c(37, # bottom
+              25), # right
+    keysize = c(1, 0.4),
+#    row.sideColors = color.mixo(as.numeric(as.factor(metadata_IMOS_MGD_MAGs$Open_or_Closed_to_fishing))),
+    row.names = T,
+legend = list(color.mixo(as.numeric(as.factor(metadata_IMOS_MGD_MAGs$Sampling_trip))),
+              title = "AIMS LTMP trips"),
+    row.sideColors = LTMP.trips.cols,
+    title = "sPLS-DA, components 1 and 2",
+xlab = "Indicator MAGs that discriminate between take and no take zones",
+ylab = "Reef sites")
+```
+
+
+```{r sPLS-DA heatmap open and closed, fig.height=27, fig.width=27, eval=TRUE, fig.cap="Clustered Image Map of the MAGs selected by sPLS-DA on the 876 IMOS GBR-MGD MAGs on the first 2 components. A hierarchical clustering based on the MAG enrichment vales for the selected MAGs, with reef sites in rows coloured according to their reef protection status (and clustered using Euclidean distance with Complete agglomeration method).", message = FALSE, warning=FALSE, echo=TRUE}
+cols.open.closed <- c("seagreen3","steelblue4")
+open.closed.cols <- palette(cols.open.closed)[as.numeric(as.factor(metadata_IMOS_MGD_MAGs$Open_or_Closed_to_fishing))]
+
+cols.open.closed <- c("seagreen3","steelblue4")
+open.closed.cols <- palette(cols.open.closed)[as.numeric(as.factor(metadata_IMOS_MGD_MAGs$Open_or_Closed_to_fishing))]
+
+cim(final.splsda.open.closed,
+    comp = 1:2,
+#    cutoff = 0.95,
+    col.names = MAGs.name.short,
+    margins=c(37, # bottom
+              25), # right
+    keysize = c(1, 0.4),
+#    row.sideColors = color.mixo(as.numeric(as.factor(metadata_IMOS_MGD_MAGs$Open_or_Closed_to_fishing))),
+    row.names = T,
+legend = list(color.mixo(as.numeric(as.factor(metadata_IMOS_MGD_MAGs$Open_or_Closed_to_fishing))),
+              title = "Reef Protection Status"),
+    row.sideColors = open.closed.cols,
+    title = "sPLS-DA, components 1 and 2",
+xlab = "Indicator MAGs that discriminate between take and no take zones",
+ylab = "Reef sites")
+```
+
+Overall, the (s)PLS-DA model is clearly selecting for winter-specific taxa, and we still see strong batch effects of seasonality and to a lesser extent geography. For monitoring purposes, it would be of higher utility to identify seawater biomarkers that would be stable indicators of reef zoning across the Great Barrier Reef, and regardless of season and geography.
+
+In Terzin et al. 2025 (Microbiome) we used ***M***ultivariate ***INT***egration (Rohart et al. 2017) to identify shared microbial indicators across the four sampling trips in our data, however, this study will also contain AIMS-LTMP benthic cover metrics, and since LTMP data has historically been analysed across GBR sectors, here we will select SECTOR as separate studies in MINT.
+
+Let's mine for stable microbial biomarkers.
+
+## MINT sPLS-DA with ***876 IMOS-MGD MAGs (95% ANI)*** - discriminating between reefs that are ***open or closed to fishing*** (in sPLS-DA), while ***accounting for the sector-specific variability*** (MINT)
+
+### Tuning the number of dimensions
+
+The perf() function is used to estimate the performance of the MINT-sPLS-DA model using ***L***eave ***O***ne ***G***roup ***O***ut ***C***ross Validation (LOGOCV), and to choose the optimal number of components for our final model
+
+```{r Open and closed to fishing, fig.height=6, fig.width=8, fig.cap="Choosing the number of components in mint.splsda using perf() with LOGOCV to discriminate between reefs that are open or closed to fishing. Classification error rates (overall and balanced - BER) are represented on the y-axis with respect to the number of components on the x-axis for each prediction distance. Overall and balanced error rates show the same trend as the design is balanced (i.e. the same number of protected and non-protected reefs in each sampling trip). The plot shows that the error rate reaches a minimum with three dimensions with the centroids prediction distance. We therefore retained 3 PCs in downstream analysis.", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# Extracting the dataframe
+### Important: pMAGs_95ANI_phyloseq_CLR_per_sector is the new object where I clr transformed within each sector separately! The object MAGs should be made from this object: pMAGs_95ANI_phyloseq_clr, and it should be used when not accounting for sector (PCA, sPLS-DA, etc)
+MAGs_MINT <- as.data.frame(pMAGs_95ANI_phyloseq_CLR_per_sector@otu_table)
+MAGs_MINT <- t(MAGs_MINT)
+# Check dimensions of data
+dim(MAGs_MINT)
+class(MAGs_MINT)
+
+# This was already done in the code above - CLR normalised across all data
+# MAGs <- as.data.frame(pMAGs_95ANI_phyloseq_clr@otu_table)
+# MAGs <- t(MAGs)
+# Check dimensions of data
+# dim(MAGs)
+# class(MAGs)
+
+mint.splsda.open.closed <- mint.splsda(X = MAGs_MINT,
+                              Y = pMAGs_95ANI_phyloseq_CLR_per_sector@sam_data$Open_or_Closed_to_fishing,
+                              study = pMAGs_95ANI_phyloseq_CLR_per_sector@sam_data$Sampling_trip,
+                              ncomp = 10)
+perf.mint.splsda.open.closed <- perf(mint.splsda.open.closed)
+plot(perf.mint.splsda.open.closed)
+```
+
+```{r Open and closed to fishing sector, fig.height=6, fig.width=8, fig.cap="Choosing the number of components in mint.splsda using perf() with LOGOCV to discriminate between reefs that are open or closed to fishing. Classification error rates (overall and balanced - BER) are represented on the y-axis with respect to the number of components on the x-axis for each prediction distance. Overall and balanced error rates show the same trend as the design is balanced (i.e. the same number of protected and non-protected reefs in each sampling trip). The plot shows that the error rate reaches a minimum with three dimensions with the centroids prediction distance. We therefore retained 3 PCs in downstream analysis.", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# Re-running MINT sPLS-DA
+mint.splsda.open.closed.sector <- mint.splsda(X = MAGs_MINT,
+                              Y = pMAGs_95ANI_phyloseq_CLR_per_sector@sam_data$Open_or_Closed_to_fishing,
+                              study = pMAGs_95ANI_phyloseq_CLR_per_sector@sam_data$SECTOR_N_S,
+                              ncomp = 10)
+perf.mint.splsda.open.closed.sector <- perf(mint.splsda.open.closed.sector)
+plot(perf.mint.splsda.open.closed.sector)
+```
+
+```{r Open and closed to fishing 6 sectors, fig.height=6, fig.width=8, fig.cap="Choosing the number of components in mint.splsda using perf() with LOGOCV to discriminate between reefs that are open or closed to fishing. Classification error rates (overall and balanced - BER) are represented on the y-axis with respect to the number of components on the x-axis for each prediction distance. Overall and balanced error rates show the same trend as the design is balanced (i.e. the same number of protected and non-protected reefs in each sampling trip). The plot shows that the error rate reaches a minimum with three dimensions with the centroids prediction distance. We therefore retained 3 PCs in downstream analysis.", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# Filtering out the samples from Swains - this will be the query
+pMAGs_95ANI_phyloseq_no_Swains <- subset_samples(pMAGs_95ANI_phyloseq, SECTOR_N_S != "06_Swains")
+pMAGs_95ANI_phyloseq_Swains_only <- subset_samples(pMAGs_95ANI_phyloseq, SECTOR_N_S == "06_Swains")
+
+# Need to CLR transform again - within each sector:
+# 1. Extract sample data and sectors
+sector_info <- sample_data(pMAGs_95ANI_phyloseq_no_Swains)$SECTOR_N_S
+sectors <- unique(sector_info)
+
+# 2. Initialize an empty list to store CLR-transformed subsets
+phy_clr_list <- list()
+
+# 3. Loop through each sector, apply CLR, and store results
+for (sector in sectors) {
+  # Subset phyloseq by sector
+  phy_subset <- subset_samples(pMAGs_95ANI_phyloseq_no_Swains, SECTOR_N_S == sector)
+  
+  # Apply CLR to the subset (with pseudo-count to avoid zeros)
+  phy_subset_clr <- microbiome::transform(phy_subset, transform = "clr")
+  
+  # Store in list
+  phy_clr_list[[sector]] <- phy_subset_clr
+}
+
+# 4. Merge all sectors back into one phyloseq object
+pMAGs_95ANI_phyloseq_CLR_per_sector_no_Swains <- do.call(merge_phyloseq, phy_clr_list)
+
+# 5. Verify the output
+head(otu_table(pMAGs_95ANI_phyloseq_CLR_per_sector_no_Swains))  # Should show CLR values
+
+### IMPORTANT: use pMAGs_95ANI_phyloseq_CLR_per_sector_no_Swains only for MINT!!
+
+# CLR transforming only within Swains - use this object for PCA
+pMAGs_95ANI_phyloseq_clr_Swains_only <- microbiome::transform(pMAGs_95ANI_phyloseq_Swains_only, transform = "clr")
+# This object pMAGs_95ANI_phyloseq_clr_Swains_only will be to validate the model
+
+# Extracting the dataframe
+MAGs_no_Swains <- as.data.frame(pMAGs_95ANI_phyloseq_CLR_per_sector_no_Swains@otu_table)
+MAGs_no_Swains <- t(MAGs_no_Swains)
+# Check dimensions of data
+dim(MAGs_no_Swains)
+class(MAGs_no_Swains)
+
+mint.splsda.open.closed_no_Swains <- mint.splsda(X = MAGs_no_Swains,
+                              Y = pMAGs_95ANI_phyloseq_CLR_per_sector_no_Swains@sam_data$Open_or_Closed_to_fishing,
+                              study = pMAGs_95ANI_phyloseq_CLR_per_sector_no_Swains@sam_data$SECTOR_N_S,
+                              ncomp = 10)
+perf.mint.splsda.open.closed_no_Swains <- perf(mint.splsda.open.closed_no_Swains)
+plot(perf.mint.splsda.open.closed_no_Swains)
+```
+
+Let's see the overlap of selected features between MINT sPLS-DA models when study = Sampling_trip vs Sector.
+
+```{r MINT sPLS-DA Venn diagram, fig.height=4, fig.width=4, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# making sure that similar taxa are selected in MINT sPLS-DA models when I select TRIP or SECTOR as a study
+mint.splsda.open.closed.trip.100 <- mint.splsda(X = MAGs,
+                              Y = pMAGs_95ANI_phyloseq_clr@sam_data$Open_or_Closed_to_fishing,
+                              study = pMAGs_95ANI_phyloseq_clr@sam_data$Sampling_trip,
+                              keepX = c(100, 10),
+                              ncomp = 2)
+mint.splsda.open.closed.sector.100 <- mint.splsda(X = MAGs,
+                              Y = pMAGs_95ANI_phyloseq_clr@sam_data$Open_or_Closed_to_fishing,
+                              study = pMAGs_95ANI_phyloseq_clr@sam_data$SECTOR_N_S,
+                              keepX = c(100, 10),
+                              ncomp = 2)
+
+# Extracting the 100 indicators
+mint.splsda.open.closed.trip.100.vars <- selectVar(mint.splsda.open.closed.trip.100, comp = 1)$name
+mint.splsda.open.closed.sector.100.vars <- selectVar(mint.splsda.open.closed.sector.100, comp = 1)$name
+
+### Ready for a Venn diagram now:
+# Find the intersection (shared features) between the two
+shared_features <- intersect(mint.splsda.open.closed.trip.100.vars, mint.splsda.open.closed.sector.100.vars)
+
+# Create a Venn diagram
+venn.plot <- venn.diagram(
+  x = list(
+    "Trip" = mint.splsda.open.closed.trip.100.vars,
+    "Sector" = mint.splsda.open.closed.sector.100.vars
+  ),
+  category.names = c("Trip", "Sector"),
+  filename = NULL,  # Do not save to file, just plot it
+  output = TRUE
+)
+
+# Plot the Venn diagram
+grid.draw(venn.plot)
+
+# If you want to see the number of shared features
+cat("Number of shared features: ", length(shared_features), "\n")
+```
+
+As the results are largely similar, we will continue with sector-specific MINT (sPLS-DA and sPLS) from now on.
+
+Also checking the overlap between MINT sPLS-DA on 7 and 6 sectors (i.e., no Swains)
+
+```{r MINT sPLS-DA Venn diagram 6 and seven sectors, fig.height=4, fig.width=4, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# making sure that similar taxa are selected in MINT sPLS-DA models when I select TRIP or SECTOR as a study
+mint.splsda.open.closed.6sectors.100 <- mint.splsda(X = MAGs_no_Swains,
+                              Y = pMAGs_95ANI_phyloseq_CLR_per_sector_no_Swains@sam_data$Open_or_Closed_to_fishing,
+                              study = pMAGs_95ANI_phyloseq_CLR_per_sector_no_Swains@sam_data$SECTOR_N_S,
+                              keepX = c(100, 10),
+                              ncomp = 2)
+mint.splsda.open.closed.7sectors.100 <- mint.splsda(X = MAGs_MINT,
+                              Y = pMAGs_95ANI_phyloseq_CLR_per_sector@sam_data$Open_or_Closed_to_fishing,
+                              study = pMAGs_95ANI_phyloseq_CLR_per_sector@sam_data$SECTOR_N_S,
+                              keepX = c(100, 10),
+                              ncomp = 2)
+
+# Extracting the 100 indicators
+mint.splsda.open.closed.6sectors.100.vars <- selectVar(mint.splsda.open.closed.6sectors.100, comp = 1)$name
+mint.splsda.open.closed.7sectors.100.vars <- selectVar(mint.splsda.open.closed.7sectors.100, comp = 1)$name
+
+### Ready for a Venn diagram now:
+# Find the intersection (shared features) between the two
+shared_features <- intersect(mint.splsda.open.closed.6sectors.100.vars,
+                             mint.splsda.open.closed.7sectors.100.vars)
+
+# Create a Venn diagram
+venn.plot <- venn.diagram(
+  x = list(
+    "MINT sPLS-DA no Swains" = mint.splsda.open.closed.6sectors.100.vars,
+    "MINT sPLS-DA all sectors" = mint.splsda.open.closed.7sectors.100.vars
+  ),
+  category.names = c("6 sectors", "7 sectors"),
+  filename = NULL,  # Do not save to file, just plot it
+  output = TRUE
+)
+
+# Plot the Venn diagram
+grid.draw(venn.plot)
+
+# If you want to see the number of shared features
+cat("Number of shared features: ", length(shared_features), "\n")
+```
+
+Again, largely similar results, but we will present a model with all seven sectors in the final manuscript (even though the design is unbalanced in Swains, but this is not an issue for MINT) 
+
+```{r MINT sPLS-DA error rate across sectors, fig.height=6, fig.width=8, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+perf.mint.splsda.open.closed.sector$global.error$BER
+```
+
+But it may also be interesting too see the stats on this within sectors - is the error higher in some sectors compared to the others?
+
+```{r MINT sPLS-DA error rates within sectors per study, fig.height=6, fig.width=8, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# Initialize an empty list to store the results
+study_errors_overall <- list()
+
+# Loop through each study in the 'study.specific.error' section
+for (study_name in names(perf.mint.splsda.open.closed.sector[["study.specific.error"]])) {
+  # Extract the error rate for the current study
+  study_error_overall <- perf.mint.splsda.open.closed.sector$study.specific.error[[study_name]]$overall
+  
+  # Add the study name as a column to the error data
+  study_error_with_name_overall <- cbind(Study = study_name, study_error_overall)
+  
+  # Store the error data in the list
+  study_errors_overall[[study_name]] <- study_error_with_name_overall
+}
+
+# Combine all study data into a single data frame
+study_error_df_overall <- do.call(rbind, study_errors_overall)
+
+# Display the table
+knitr::kable(as.data.frame(study_error_df_overall), caption = "MINT sPLS-DA - error rate (centroids distance) across GBR sectors")
+```
+
+```{r no Swains MINT sPLS-DA error rates within sectors, fig.height=6, fig.width=8, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# Initialize an empty list to store the results
+study_errors_overall_no_Swains <- list()
+
+# Loop through each study in the 'study.specific.error' section
+for (study_name in names(perf.mint.splsda.open.closed_no_Swains[["study.specific.error"]])) {
+  # Extract the error rate for the current study
+  study_error_overall <- perf.mint.splsda.open.closed_no_Swains$study.specific.error[[study_name]]$overall  # <- Fixed variable name
+  
+  # Add the study name as a column to the error data
+  study_error_with_name_overall <- cbind(Study = study_name, study_error_overall)  # <- Fixed variable name
+  
+  # Store the error data in the list
+  study_errors_overall_no_Swains[[study_name]] <- study_error_with_name_overall
+}
+
+# Combine all study data into a single data frame
+study_error_df_overall_no_Swains <- do.call(rbind, study_errors_overall_no_Swains)
+
+# Display the table
+knitr::kable(as.data.frame(study_error_df_overall_no_Swains), caption = "MINT sPLS-DA - error rate (centroids distance) across six GBR sectors (Swains excluded)")
+```
+
+
+```{r MINT sPLS-DA error rate within sectors and separately for C and O, fig.height=6, fig.width=8, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# Initialize an empty list to store the results
+study_errors <- list()
+
+# Loop through each study in the 'study.specific.error' section
+for (study_name in names(perf.mint.splsda.open.closed.sector[["study.specific.error"]])) {
+  # Extract the error rate for the current study
+  study_error <- perf.mint.splsda.open.closed.sector$study.specific.error[[study_name]]$error.rate.class$centroids.dist
+  
+  # Add the study name as a column to the error data
+  study_error_with_name <- cbind(Study = study_name, study_error)
+  
+  # Store the error data in the list
+  study_errors[[study_name]] <- study_error_with_name
+}
+
+# Combine all study data into a single data frame
+study_error_df <- do.call(rbind, study_errors)
+
+# Display the table
+knitr::kable(as.data.frame(study_error_df), caption = "MINT sPLS-DA - error rate (centroids distance) across GBR sectors, and separately for C and O")
+```
+
+```{r no Swains MINT sPLS-DA error rate within sectors and separately for C and O (no Swains), fig.height=6, fig.width=8, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# Initialize an empty list to store the results
+study_errors_no_Swains <- list()
+
+# Loop through each study in the 'study.specific.error' section
+for (study_name in names(perf.mint.splsda.open.closed_no_Swains[["study.specific.error"]])) {
+  # Extract the error rate for the current study
+  study_error <- perf.mint.splsda.open.closed_no_Swains$study.specific.error[[study_name]]$error.rate.class$centroids.dist
+  
+  # Add the study name as a column to the error data
+  study_error_with_name_no_Swains <- cbind(Study = study_name, study_error)
+  
+  # Store the error data in the list
+  study_errors_no_Swains[[study_name]] <- study_error_with_name_no_Swains
+}
+
+# Combine all study data into a single data frame
+study_error_df_no_Swains <- do.call(rbind, study_errors_no_Swains)
+
+# Display the table
+knitr::kable(as.data.frame(study_error_df_no_Swains), caption = "MINT sPLS-DA - error rate (centroids distance) across GBR sectors (Swains excluded), and separately for C and O")
+```
+
+### Tuning the number of features per dimension
+
+We can choose the keepX parameter using the tune() function for a MINT object. The function performs LOGOCV for different values of test.keepX provided on each component, and no repeat argument is needed. Based on the mean classification error rate (overall error rate or BER) and a centroids distance, we output the optimal number of variables keepX to be included in the final model. This step was skipped and we retained 50 MAGs per each of the three dimensions.
+
+```{r MINT sPLS-DA open and closed in sectors tuning the number of features per PC, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# But in case I ever decide to do the tuning, this would be the script
+tune.mint.splsda.open.closed.sector <- tune(X = MAGs_MINT,
+                                     Y = as.factor(pMAGs_95ANI_phyloseq_CLR_per_sector@sam_data$Open_or_Closed_to_fishing),
+                                     study = as.factor(pMAGs_95ANI_phyloseq_CLR_per_sector@sam_data$SECTOR_N_S),
+                                     ncomp = 5,
+                                     test.keepX = seq(10, 500, 10),
+                                     method = 'mint.splsda', #Specify the method
+                                     measure = 'BER',
+                                     dist = "centroids.dist")
+```
+
+```{r no Swains MINT sPLS-DA open and closed in sectors tuning the number of features per PC, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# But in case I ever decide to do the tuning, this would be the script
+tune.mint.splsda.open.closed.sector_no_Swains <- tune(X = MAGs_no_Swains,
+                                     Y = as.factor(pMAGs_95ANI_phyloseq_CLR_per_sector_no_Swains@sam_data$Open_or_Closed_to_fishing),
+                                     study = as.factor(pMAGs_95ANI_phyloseq_CLR_per_sector_no_Swains@sam_data$SECTOR_N_S),
+                                     ncomp = 5,
+                                     test.keepX = seq(10, 500, 10),
+                                     method = 'mint.splsda', #Specify the method
+                                     measure = 'BER',
+                                     dist = "centroids.dist")
+```
+
+```{r plot MINT sPLS-DA features sector, fig.height=5, fig.width=12, fig.cap="Tuning plot of the MINT sPLS-DA models with up to 5 components. Diamonds represent the optimal number of features on a given component. Balanced error rate found on the vertical axis and is the metric to be minimised.", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+plot(tune.mint.splsda.open.closed.sector, sd = FALSE)
+```
+
+```{r MINT sPLS-DA features numeric sector, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+### Optimal nyumber of components
+tune.mint.splsda.open.closed.sector$choice.ncomp
+
+### Optimal number of ffeatures per component
+tune.mint.spls_da.optimal.keepX.sector <- tune.mint.splsda.open.closed.sector$choice.keepX # extract optimal values
+tune.mint.spls_da.optimal.keepX.sector
+```
+
+```{r no Swains plot MINT sPLS-DA features sector, fig.height=5, fig.width=12, fig.cap="Tuning plot of the MINT sPLS-DA models with up to 5 components. Diamonds represent the optimal number of features on a given component. Balanced error rate found on the vertical axis and is the metric to be minimised.", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+plot(tune.mint.splsda.open.closed.sector_no_Swains, sd = FALSE)
+```
+
+```{r no Swains MINT sPLS-DA features numeric sector, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+### Optimal nyumber of components
+# tune.mint.splsda.open.closed$choice.ncomp
+
+### Optimal number of ffeatures per component
+tune.mint.spls_da.optimal.keepX.sector_no_Swains <- tune.mint.splsda.open.closed.sector_no_Swains$choice.keepX # extract optimal values
+tune.mint.spls_da.optimal.keepX.sector_no_Swains
+```
+
+```{r MINT PLS-DA sector protection status assessing the final model numerical outputs per class, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+tune.mint.splsda.open.closed.sector[["error.rate.class"]]
+```
+
+```{r no Swains MINT PLS-DA sector protection status assessing the final model numerical outputs per class, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+tune.mint.splsda.open.closed.sector_no_Swains[["error.rate.class"]]
+```
+
+```{r MINT sPLS-DA open closed final model sector, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+final.mint.splsda.open.closed.sector <- mint.splsda(X = MAGs_MINT,
+                                             Y = pMAGs_95ANI_phyloseq_CLR_per_sector@sam_data$Open_or_Closed_to_fishing,
+                                             keepX = tune.mint.spls_da.optimal.keepX.sector,
+#                                             keepX = c(50, 50, 50), # Uncomment for arbitrary number of features
+                                             study = pMAGs_95ANI_phyloseq_CLR_per_sector@sam_data$SECTOR_N_S,
+                                             ncomp = 2) # based on the BER
+```
+
+```{r no Swains MINT sPLS-DA open closed final model sector, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+final.mint.splsda.open.closed.sector_no_Swains <- mint.splsda(X = MAGs_no_Swains,
+                                             Y = pMAGs_95ANI_phyloseq_CLR_per_sector_no_Swains@sam_data$Open_or_Closed_to_fishing,
+                                             keepX = tune.mint.spls_da.optimal.keepX.sector_no_Swains,
+#                                             keepX = c(50, 50, 50), # Uncomment for arbitrary number of features
+                                             study = pMAGs_95ANI_phyloseq_CLR_per_sector_no_Swains@sam_data$SECTOR_N_S,
+                                             ncomp = 2) # based on the BER
+```
+
+```{r MINT sPLS-DA sample plot open closed, fig.cap="Sample plot from the MINT sPLS-DA performed on the IMOS-MGD seawater MAGs to identify microbes that discriminate between reefs that are open or closed to fishing. Samples (reef sites) are projected into the MINT sPLS-DA space spanned by the first two components, and coloured by their corresponding category reflecting reef protection level. Symbols indicate the membership to an LTMP trip/transect. Component 1 discriminates between the two reef categories.", fig.height=6, fig.width=12, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+sample.plot.mint.splsda.open.closed.global <- plotIndiv(final.mint.splsda.open.closed.sector,
+          study = "global",
+          comp = c(1,2), # We can look into comp 3 too, but I think 2 dimensions are enough
+          legend = TRUE,
+          col.per.group = c("seagreen3", # Closed to fishing
+                            "steelblue4"), # open to fishing
+#          title = 'MINT sPLS-DA using IMOS GBR-MGD MAGs | PCs 1-2',
+          subtitle = 'Reefs that are open or closed to fishing',
+          ellipse = T,
+          )
+```
+
+```{r no Swains MINT sPLS-DA sample plot open closed, fig.cap="Sample plot from the MINT sPLS-DA performed on the IMOS-MGD seawater MAGs to identify microbes that discriminate between reefs that are open or closed to fishing. Samples (reef sites) are projected into the MINT sPLS-DA space spanned by the first two components, and coloured by their corresponding category reflecting reef protection level. Symbols indicate the membership to an LTMP trip/transect. Component 1 discriminates between the two reef categories.", fig.height=5, fig.width=8, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, results='hide', fig.show='hide'}
+sample.plot.mint.splsda.open.closed.global_no_Swains <- plotIndiv(final.mint.splsda.open.closed.sector_no_Swains,
+          study = "global",
+          comp = c(1,2), # We can look into comp 3 too, but I think 2 dimensions are enough
+          legend = TRUE,
+          col.per.group = c("seagreen3", # Closed to fishing
+                            "steelblue4"), # open to fishing
+          title = 'MINT sPLS-DA | Training dataset on 6 sectors',
+          subtitle = 'MINT sPLS-DA | Training dataset on 6 sectors',
+          ellipse = T
+#          pch = pch.vec
+          )
+```
+
+```{r MINT sPLS-DA sample plot partial for Open and Closed sectors, fig.height=6, fig.width=16, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+sample.plot.mint.splsda.open.closed.partial.sector <- plotIndiv(final.mint.splsda.open.closed.sector,
+          legend = TRUE,
+          study = "all.partial",
+          col.per.group = c("seagreen3", # Closed to fishing
+                            "steelblue4"), # open to fishing
+#          title = 'MINT sPLS-DA using IMOS GBR-MGD MAGs: Open or Closed to fishing',
+          ellipse = F)
+```
+
+```{r no Swains MINT sPLS-DA sample plot partial for Open and Closed sectors, fig.height=6, fig.width=16, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+sample.plot.mint.splsda.open.closed.partial.sector_no_Swains <- plotIndiv(final.mint.splsda.open.closed.sector_no_Swains,
+          legend = TRUE,
+          study = "all.partial",
+          col.per.group = c("seagreen3", # Closed to fishing
+                            "steelblue4"), # open to fishing
+#          title = 'MINT sPLS-DA using IMOS GBR-MGD MAGs: Open or Closed to fishing',
+          ellipse = F)
+```
+
+Lastly, what about those spatiotemporal batch effects we observed in (s)PLS-DA?
+
+```{r MINT sPLS-DA sample plot open closed col per trip, fig.cap="Sample plot from the MINT sPLS-DA performed on the IMOS-MGD seawater MAGs to identify microbes that discriminate between reefs that are open or closed to fishing. Samples (reef sites) are projected into the MINT sPLS-DA space spanned by the first two components, and coloured by their corresponding category reflecting reef protection level. Symbols indicate the membership to an LTMP trip/transect. Component 1 discriminates between the two reef categories.", fig.height=5, fig.width=8, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, results='hide', fig.show='hide'}
+plotIndiv(final.mint.splsda.open.closed.sector,
+          study = "global",
+          comp = c(1,2), # We can look into comp 3 too, but I think 2 dimensions are enough
+          legend = TRUE,
+          group = sample_data(pMAGs_95ANI_phyloseq_CLR_per_sector)$Sampling_trip,
+          col.per.group =c("indianred", # Sampling trip 1
+                "indianred4", # Sampling trip 2 
+                "red3", # Sampling trip 3
+                "slateblue"), # Sampling trip 4
+          title = 'MINT sPLS-DA using IMOS GBR-MGD MAGs | PCs 1-2',
+          subtitle = 'AIMS-LTMP trips', ellipse = T)
+```
+
+This plot shows that there is no longer clustering between the trips, suggesting we accounted for spatiotemporal batch effects.
+
+### Correlation circle plot
+
+We can examine our molecular signature selected with MINT sPLS-DA. The correlation circle plot highlights the contribution of each selected MAG to each component (close to the large circle), and their correlation (clusters of variables).
+
+```{r MINT sPLS DA open.closed circle correlation plot sector, fig.height=13, fig.width=13, fig.cap="Correlation circle plot representing the MAGs selected by MINT sPLS-DA to discriminate between reefs that are open or closed to fishing, across the four sampling transects. We only show the MAGs selected by MINT sPLS-DA on components 1 and 2, and with a corr. cutoff = 0.8. This graphic should be interpreted in conjunction with the sample plot above - i.e. we observe a subset of seawater MAGs that are strongly correlated and positively associated to component 1 (positive values on the x-axis, on the right), which are likely to characterise the groups of reef sites that are open to fishing. We also observe a subset of seawater MAGs that are negatively associated to dimension 1 (x-axis, left) that may characterise reef sites that are protected/closed to fishing (and are negatively correlated to the previous group of MAGs).", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# all gene names have the same first 10 characters, 
+# shorten all the names to reduce visual clutter
+plotVar(final.mint.splsda.open.closed.sector,
+        var.names = list(MAGs.name.super.short),
+        cutoff = 0.7,
+        )
+```
+
+```{r no Swains MINT sPLS DA open.closed circle correlation plot sector, fig.height=13, fig.width=13, fig.cap="Correlation circle plot representing the MAGs selected by MINT sPLS-DA to discriminate between reefs that are open or closed to fishing, across the four sampling transects. We only show the MAGs selected by MINT sPLS-DA on components 1 and 2, and with a corr. cutoff = 0.8. This graphic should be interpreted in conjunction with the sample plot above - i.e. we observe a subset of seawater MAGs that are strongly correlated and positively associated to component 1 (positive values on the x-axis, on the right), which are likely to characterise the groups of reef sites that are open to fishing. We also observe a subset of seawater MAGs that are negatively associated to dimension 1 (x-axis, left) that may characterise reef sites that are protected/closed to fishing (and are negatively correlated to the previous group of MAGs).", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# all gene names have the same first 10 characters, 
+# shorten all the names to reduce visual clutter
+plotVar(final.mint.splsda.open.closed.sector_no_Swains,
+        var.names = list(MAGs.name.super.short),
+        cutoff = 0.7,
+        )
+```
+
+### Loading plots
+
+The plotLoadings() function displays the coefficient weight of each selected MAG in each IMOS GBR-MGD transect and shows the agreement of the molecular signatures across LTMP trips. Colours indicate the reef class (open or closed to fishing) in which the mean expression value of each selected MAG is maximal. These plots should be interpreted jointly with MINT sPLS-DA sample plots.
+
+```{r Loading plots per sector, fig.height=30, fig.width=30, fig.cap="Loading plots of the MAGs selected by the MINT sPLS-DA on component 1 to discriminate between reefs that are open and closed to fishing, across sampling trips. Each plot represents one IMOS GBR-MGD transect, and the indicator MAGs are coloured according to the reef type (open or closed) they are maximally expressed in, on average. The length of the bars indicate the loading coefficient values that define the component. Several MAGs distinguish between reefs that are open or closed to fishing, and are consistently overexpressed in these samples across all sampling transects. The top 30 most influential/discriminant MAGs (on component 1) are shown.", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, results='hide', fig.show='hide'}
+loading.plots.open.closed.per.sector <- plotLoadings(final.mint.splsda.open.closed.sector,
+             contrib = "max",
+             method = 'mean',
+             comp=1,
+             legend = TRUE,
+             legend.color = c("seagreen3", # Closed
+                              "steelblue4"), # Open
+             ndisplay = 60,
+             name.var = MAGs.name.short,
+             study="all.partial",
+             title="Contribution on comp 1",
+#             subtitle = paste("Study",1:4)
+             )
+loading.plots.open.closed.per.sector
+```
+
+```{r no Swains Loading plots per sector, fig.height=30, fig.width=30, fig.cap="Loading plots of the MAGs selected by the MINT sPLS-DA on component 1 to discriminate between reefs that are open and closed to fishing, across sampling trips. Each plot represents one IMOS GBR-MGD transect, and the indicator MAGs are coloured according to the reef type (open or closed) they are maximally expressed in, on average. The length of the bars indicate the loading coefficient values that define the component. Several MAGs distinguish between reefs that are open or closed to fishing, and are consistently overexpressed in these samples across all sampling transects. The top 30 most influential/discriminant MAGs (on component 1) are shown.", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, results='hide', fig.show='hide'}
+loading.plots.open.closed.per.sector_no_Swains <- plotLoadings(final.mint.splsda.open.closed.sector_no_Swains,
+             contrib = "max",
+             method = 'mean',
+             comp=1,
+             legend = TRUE,
+             legend.color = c("seagreen3", # Closed
+                              "steelblue4"), # Open
+             ndisplay = 60,
+             name.var = MAGs.name.short,
+             study="all.partial",
+             title="Contribution on comp 1",
+#             subtitle = paste("Study",1:4)
+             )
+final.mint.splsda.open.closed.sector_no_Swains
+```
+
+We can also look at the averaged contribution across MINT studies:
+
+```{r Loading plots all sectors together, fig.height=20, fig.width=15, fig.cap="Loading plots of the MAGs selected by the MINT sPLS-DA on component 1 to discriminate between reefs that are open and closed to fishing, across sampling trips. Each plot represents one IMOS GBR-MGD transect, and the indicator MAGs are coloured according to the reef type (open or closed) they are maximally expressed in, on average. The length of the bars indicate the loading coefficient values that define the component. Several MAGs distinguish between reefs that are open or closed to fishing, and are consistently overexpressed in these samples across all sampling transects. The top 60 most influential/discriminant MAGs (on component 1) are shown.", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, results='hide', fig.show='hide'}
+loading.plots.open.closed.across.sectors <- plotLoadings(final.mint.splsda.open.closed.sector,
+             contrib = "max",
+             method = 'mean',
+             comp=1,
+             legend = TRUE,
+             legend.color = c("seagreen3", # Closed
+                              "steelblue4"), # Open
+             ndisplay = 60,
+             name.var = MAGs.name.short,
+#             study="all.partial",
+             title="Contribution on comp 1",
+#             subtitle = paste("Study",1:4)
+             )
+loading.plots.open.closed.across.sectors
+```
+
+### Clustered Image Maps
+
+The Clustered Image Map represents the enrichment levels of the MAG signature per sample. Here we use the default Euclidean distance and Complete linkage for the first component.
+
+```{r Heatmap, fig.height=30, fig.width=23, fig.cap="Clustered Image Map of the MAGs selected by MINT sPLS-DA for component 1 only, to discriminate between reefs that are open or closed to fishing. A hierarchical clustering based on the MAG enrichment levels of the indicator MAGs on component 1, with reef sites in rows coloured according to protection level.", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+cols.open.closed <- c("seagreen3","steelblue4")
+open.closed.cols <- palette(cols.open.closed)[as.numeric(as.factor(pMAGs_95ANI_phyloseq_CLR_per_sector@sam_data$Open_or_Closed_to_fishing))]
+
+cols.open.closed <- c("seagreen3","steelblue4")
+open.closed.cols <- palette(cols.open.closed)[as.numeric(as.factor(pMAGs_95ANI_phyloseq_CLR_per_sector@sam_data$Open_or_Closed_to_fishing))]
+
+# Exporting the names of taxa now, and making them short - easier plotting!
+MAGs.name.short <- left_join(otu_table(pMAGs_95ANI_phyloseq_CLR_per_sector) %>%
+                              as.data.frame %>%
+                              rownames_to_column("OTU"),
+                            tax_table(pMAGs_95ANI_phyloseq_CLR_per_sector) %>%
+                              as.data.frame %>%
+                              rownames_to_column("OTU")) %>%
+  tidyr::unite(taxonomy, c(Class, Order, Family, Genus, Species), sep = "; ") # Adding Taxonomy info
+## Joining, by = "OTU"
+MAGs.name.short <- as.character(MAGs.name.short$taxonomy)
+
+cim(final.mint.splsda.open.closed.sector,
+    comp = 1,
+#    cutoff = 0.95,
+    col.names = MAGs.name.short,
+    margins=c(37, # bottom
+              25), # right
+    keysize = c(1, 0.4),
+#    row.sideColors = color.mixo(as.numeric(as.factor(metadata_IMOS_MGD_MAGs$Open_or_Closed_to_fishing))),
+    row.names = T,
+legend = list(color.mixo(as.numeric(as.factor(pMAGs_95ANI_phyloseq_CLR_per_sector@sam_data$Open_or_Closed_to_fishing))),
+              title = "Reef protection level"),
+    row.sideColors = open.closed.cols,
+    title = "MINT sPLS-DA, component 1",
+xlab = "Indicator MAGs that discriminate between take and no take zones",
+ylab = "Reef sites")
+```
+
+```{r no Swains Heatmap, fig.height=30, fig.width=23, fig.cap="Clustered Image Map of the MAGs selected by MINT sPLS-DA for component 1 only, to discriminate between reefs that are open or closed to fishing. A hierarchical clustering based on the MAG enrichment levels of the indicator MAGs on component 1, with reef sites in rows coloured according to protection level.", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+cols.open.closed <- c("seagreen3","steelblue4")
+open.closed.cols <- palette(cols.open.closed)[as.numeric(as.factor(pMAGs_95ANI_phyloseq_CLR_per_sector_no_Swains@sam_data$Open_or_Closed_to_fishing))]
+
+cols.open.closed <- c("seagreen3","steelblue4")
+open.closed.cols <- palette(cols.open.closed)[as.numeric(as.factor(pMAGs_95ANI_phyloseq_CLR_per_sector_no_Swains@sam_data$Open_or_Closed_to_fishing))]
+
+# Exporting the names of taxa now, and making them short - easier plotting!
+MAGs.name.short <- left_join(otu_table(pMAGs_95ANI_phyloseq_CLR_per_sector_no_Swains) %>%
+                              as.data.frame %>%
+                              rownames_to_column("OTU"),
+                            tax_table(pMAGs_95ANI_phyloseq_CLR_per_sector_no_Swains) %>%
+                              as.data.frame %>%
+                              rownames_to_column("OTU")) %>%
+  tidyr::unite(taxonomy, c(Class, Order, Family, Genus, Species), sep = "; ") # Adding Taxonomy info
+## Joining, by = "OTU"
+MAGs.name.short <- as.character(MAGs.name.short$taxonomy)
+
+cim(final.mint.splsda.open.closed.sector_no_Swains,
+    comp = 1,
+#    cutoff = 0.95,
+    col.names = MAGs.name.short,
+    margins=c(37, # bottom
+              25), # right
+    keysize = c(1, 0.4),
+#    row.sideColors = color.mixo(as.numeric(as.factor(metadata_IMOS_MGD_MAGs$Open_or_Closed_to_fishing))),
+    row.names = T,
+legend = list(color.mixo(as.numeric(as.factor(pMAGs_95ANI_phyloseq_CLR_per_sector_no_Swains@sam_data$Open_or_Closed_to_fishing))),
+              title = "Reef protection level"),
+    row.sideColors = open.closed.cols,
+    title = "MINT sPLS-DA, component 1",
+xlab = "Indicator MAGs that discriminate between take and no take zones",
+ylab = "Reef sites")
+```
+
+```{r Heatmap for rawgraphs sectors, fig.height=13, fig.width=30, fig.cap="Saving as R object for rawgraphs.", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, results='hide', fig.show='hide'}
+# Exporting for RawGraphs
+cols.open.closed <- c("seagreen3","steelblue4")
+open.closed.cols <- palette(cols.open.closed)[as.numeric(as.factor(pMAGs_95ANI_phyloseq_CLR_per_sector@sam_data$Open_or_Closed_to_fishing))]
+
+cols.open.closed <- c("seagreen3","steelblue4")
+open.closed.cols <- palette(cols.open.closed)[as.numeric(as.factor(pMAGs_95ANI_phyloseq_CLR_per_sector@sam_data$Open_or_Closed_to_fishing))]
+
+# Getting group assignments for the 160 MAGs selected on component 1 - info in loading plots
+loading.plots.open.closed.all.MAGs.sectors <- plotLoadings(final.mint.splsda.open.closed.sector,
+             contrib = "max",
+             method = 'mean',
+             comp=1,
+             legend = TRUE,
+             legend.color = c("seagreen3", # Closed
+                              "steelblue4"), # Open
+#             ndisplay = 30,
+             name.var = MAGs.name.short,
+             study="all.partial",
+             title="Contribution on comp 1",
+#             subtitle = paste("Study",1:4)
+             )
+loading.plots.rawgraphs.sectors <- loading.plots.open.closed.all.MAGs.sectors %>%
+  as.data.frame() # converting to data frame
+loading.plots.rawgraphs.sectors <- loading.plots.rawgraphs.sectors %>%
+  dplyr::select(ends_with("GroupContrib")) %>% 
+  rownames_to_column("OTU")
+
+# I will need the names first - full taxonomy with MAG ID numbers
+MAGs.name.full <- left_join(otu_table(pMAGs_95ANI_phyloseq_CLR_per_sector) %>%
+                              as.data.frame %>%
+                              rownames_to_column("OTU"),
+                            tax_table(pMAGs_95ANI_phyloseq_CLR_per_sector) %>%
+                              as.data.frame %>%
+                              rownames_to_column("OTU")) %>%
+  tidyr::unite(taxonomy, c(OTU, Domain, Phylum, Class, Order, Family, Genus, Species), sep = "; ") # Adding Taxonomy info
+## Joining, by = "OTU"
+MAGs.name.full <- as.character(MAGs.name.full$taxonomy)
+
+# Saving as an R object
+mint.spls.da.rawgraphs.sectors <- cim(final.mint.splsda.open.closed.sector,
+    comp = 1,
+#    cutoff = 0.95,
+    col.names = MAGs.name.full,
+    margins=c(37, # bottom
+              25), # right
+    keysize = c(1, 0.4),
+transpose = T,
+#    row.sideColors = color.mixo(as.numeric(as.factor(metadata_IMOS_MGD_MAGs$Open_or_Closed_to_fishing))),
+    row.names = T,
+legend = list(color.mixo(as.numeric(as.factor(pMAGs_95ANI_phyloseq_CLR_per_sector@sam_data$Open_or_Closed_to_fishing))),
+              title = "Reef protection level"),
+    row.sideColors = open.closed.cols,
+    title = "MINT sPLS-DA, component 1",
+xlab = "Indicator MAGs that discriminate between take and no take zones",
+ylab = "Reef sites")
+
+# Making a final object for RawGraphs
+rawgraphs.order.sectors <- mint.spls.da.rawgraphs.sectors$col.names %>% 
+  as.data.frame() %>% 
+  tidyr::separate(., col = ., into = c("OTU", "Domain", "Phylum", "Class", "Order", "Family", "Genus", "Species"), sep = "; ") # Separating again
+rawgraphs_final.sectors <- left_join(rawgraphs.order.sectors, loading.plots.rawgraphs.sectors)
+
+# Exporting :)
+write.csv(rawgraphs_final.sectors, file = "/home/marko-terzin/Desktop/MINT_sPLS_DA_for_rawgraphs_sectors.csv", row.names = F, quote = F)
+```
+
+```{r Heatmap GroupContrib sectors, fig.height=40, fig.width=6, fig.cap="Saving as R object for rawgraphs.", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# Reordering to have the same order as in the MINT sPLS-DA heatmap
+# Used the solution from here:
+# https://syntaxfix.com/question/22528/how-do-you-specifically-order-ggplot2-x-axis-instead-of-alphabetical-order
+group.contrib.order.sectors <- rawgraphs.order.sectors$OTU %>% 
+  as.data.frame()
+colnames(group.contrib.order.sectors) <- "OTU"
+loading.plots.rawgraphs.sectors <- left_join(group.contrib.order.sectors, loading.plots.rawgraphs.sectors)
+
+# And lastly, plotting group contrib as a heatmap
+loading.plots.long.sectors <- pivot_longer(loading.plots.rawgraphs.sectors, colnames(loading.plots.rawgraphs.sectors[,2:8]))
+# Plotting
+ggplot(loading.plots.long.sectors,                                # Draw heatmap-like plot
+       aes(y=factor(OTU, level = unique(loading.plots.rawgraphs.sectors$OTU)), # Ordering in the same order as on the cim heatmap
+           x=name,
+           fill = value)) +
+  geom_tile() + # plot a heatmap
+  scale_fill_manual(values = c("seagreen3", # No-take zones
+                               "steelblue4")) + # Take zones
+    labs(x = 'AIMS-LTMP sectors',
+       y = "Indicator MAGs",
+       title = 'Take vs. no-take zones') +
+      theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 12))
+```
+
+```{r no Swains Heatmap for rawgraphs sectors, fig.height=13, fig.width=30, fig.cap="Saving as R object for rawgraphs.", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, results='hide', fig.show='hide'}
+# Exporting for RawGraphs
+cols.open.closed <- c("seagreen3","steelblue4")
+open.closed.cols <- palette(cols.open.closed)[as.numeric(as.factor(pMAGs_95ANI_phyloseq_CLR_per_sector_no_Swains@sam_data$Open_or_Closed_to_fishing))]
+
+cols.open.closed <- c("seagreen3","steelblue4")
+open.closed.cols <- palette(cols.open.closed)[as.numeric(as.factor(pMAGs_95ANI_phyloseq_CLR_per_sector_no_Swains@sam_data$Open_or_Closed_to_fishing))]
+
+# Getting group assignments for the 160 MAGs selected on component 1 - info in loading plots
+loading.plots.open.closed.all.MAGs.sectors_no_Swains <- plotLoadings(final.mint.splsda.open.closed.sector_no_Swains,
+             contrib = "max",
+             method = 'mean',
+             comp=1,
+             legend = TRUE,
+             legend.color = c("seagreen3", # Closed
+                              "steelblue4"), # Open
+#             ndisplay = 30,
+             name.var = MAGs.name.short,
+             study="all.partial",
+             title="Contribution on comp 1",
+#             subtitle = paste("Study",1:4)
+             )
+loading.plots.rawgraphs.sectors_no_Swains <- loading.plots.open.closed.all.MAGs.sectors_no_Swains %>%
+  as.data.frame() # converting to data frame
+loading.plots.rawgraphs.sectors_no_Swains <- loading.plots.rawgraphs.sectors_no_Swains %>%
+  dplyr::select(ends_with("GroupContrib")) %>% 
+  rownames_to_column("OTU")
+
+# I will need the names first - full taxonomy with MAG ID numbers
+MAGs.name.full <- left_join(otu_table(pMAGs_95ANI_phyloseq_CLR_per_sector_no_Swains) %>%
+                              as.data.frame %>%
+                              rownames_to_column("OTU"),
+                            tax_table(pMAGs_95ANI_phyloseq_CLR_per_sector_no_Swains) %>%
+                              as.data.frame %>%
+                              rownames_to_column("OTU")) %>%
+  tidyr::unite(taxonomy, c(OTU, Domain, Phylum, Class, Order, Family, Genus, Species), sep = "; ") # Adding Taxonomy info
+## Joining, by = "OTU"
+MAGs.name.full <- as.character(MAGs.name.full$taxonomy)
+
+# Saving as an R object
+mint.spls.da.rawgraphs.sectors_no_Swains <- cim(final.mint.splsda.open.closed.sector_no_Swains,
+    comp = 1,
+#    cutoff = 0.95,
+    col.names = MAGs.name.full,
+    margins=c(37, # bottom
+              25), # right
+    keysize = c(1, 0.4),
+transpose = T,
+#    row.sideColors = color.mixo(as.numeric(as.factor(metadata_IMOS_MGD_MAGs$Open_or_Closed_to_fishing))),
+    row.names = T,
+legend = list(color.mixo(as.numeric(as.factor(pMAGs_95ANI_phyloseq_CLR_per_sector@sam_data$Open_or_Closed_to_fishing))),
+              title = "Reef protection level"),
+    row.sideColors = open.closed.cols,
+    title = "MINT sPLS-DA, component 1",
+xlab = "Indicator MAGs that discriminate between take and no take zones",
+ylab = "Reef sites")
+
+# Making a final object for RawGraphs
+rawgraphs.order.sectors_no_Swains <- mint.spls.da.rawgraphs.sectors_no_Swains$col.names %>% 
+  as.data.frame() %>% 
+  tidyr::separate(., col = ., into = c("OTU", "Domain", "Phylum", "Class", "Order", "Family", "Genus", "Species"), sep = "; ") # Separating again
+rawgraphs_final.sectors_no_Swains <- left_join(rawgraphs.order.sectors_no_Swains, loading.plots.rawgraphs.sectors_no_Swains)
+
+# Exporting :)
+write.csv(rawgraphs_final.sectors_no_Swains, file = "/home/marko-terzin/Desktop/MINT_sPLS_DA_for_rawgraphs_sectors_no_Swains.csv", row.names = F, quote = F)
+```
+
+```{r no Swains Heatmap GroupContrib sectors, fig.height=40, fig.width=6, fig.cap="Saving as R object for rawgraphs.", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# Reordering to have the same order as in the MINT sPLS-DA heatmap
+# Used the solution from here:
+# https://syntaxfix.com/question/22528/how-do-you-specifically-order-ggplot2-x-axis-instead-of-alphabetical-order
+group.contrib.order.sectors_no_Swains <- rawgraphs.order.sectors_no_Swains$OTU %>% 
+  as.data.frame()
+colnames(group.contrib.order.sectors_no_Swains) <- "OTU"
+loading.plots.rawgraphs.sectors_no_Swains <- left_join(group.contrib.order.sectors_no_Swains, loading.plots.rawgraphs.sectors_no_Swains)
+
+# And lastly, plotting group contrib as a heatmap
+loading.plots.long.sectors_no_Swains <- pivot_longer(loading.plots.rawgraphs.sectors_no_Swains, colnames(loading.plots.rawgraphs.sectors_no_Swains[,2:7]))
+# Plotting
+ggplot(loading.plots.long.sectors_no_Swains,                                # Draw heatmap-like plot
+       aes(y=factor(OTU, level = unique(loading.plots.rawgraphs.sectors_no_Swains$OTU)), # Ordering in the same order as on the cim heatmap
+           x=name,
+           fill = value)) +
+  geom_tile() + # plot a heatmap
+  scale_fill_manual(values = c("seagreen3", # No-take zones
+                               "steelblue4")) + # Take zones
+    labs(x = '6 AIMS-LTMP sectors',
+       y = "Indicator MAGs",
+       title = 'Take vs. no-take zones') +
+      theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 12))
+```
+
+### Performance of the MINT sPLS-DA model
+
+Use of the auroc() function will yield a visualisation of classification performance when undergoing the LOGOCV procedure from above. The interpretation of this output may not be particularly insightful in relation to the performance evaluation of our methods, but can complement the statistical analysis. For example, the model's classification of open vs. closed sites had ~78% accuracy in classifying open and closed reefs in their corresponding category.
+
+```{r MINT sPLS-DA model performance sectors, fig.height=4, fig.width=6, fig.cap="ROC curve and AUC from the MINT sPLS-DA performed on the IMOS GBR-MGD MAGs (876 MAGs, dereplicated in dRep at 95% ANI) for global component 1 for the open vs. closed reefs comparison. Numerical outputs include the AUC (0.7831) and a Wilcoxon test p−value (8.489e-12) for open vs. closed reefs class comparison that are performed per component.", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+MINT_sPLS_da_open_closed_model_performance.sectors <- auroc(final.mint.splsda.open.closed.sector,
+                                                            roc.comp = 1,
+                                                            print = FALSE)
+MINT_sPLS_da_open_closed_model_performance.sectors$Comp1
+```
+
+```{r no Swains MINT sPLS-DA model performance sectors, fig.height=4, fig.width=6, fig.cap="ROC curve and AUC from the MINT sPLS-DA performed on the IMOS GBR-MGD MAGs (876 MAGs, dereplicated in dRep at 95% ANI) for global component 1 for the open vs. closed reefs comparison. Numerical outputs include the AUC (0.7831) and a Wilcoxon test p−value (8.489e-12) for open vs. closed reefs class comparison that are performed per component.", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+MINT_sPLS_da_open_closed_model_performance.sectors_no_Swains <- auroc(final.mint.splsda.open.closed.sector_no_Swains,
+                                                            roc.comp = 1,
+                                                            print = FALSE)
+MINT_sPLS_da_open_closed_model_performance.sectors_no_Swains$Comp1
+```
+
+### Can we validate this on the Swains sector? Prediction on an external study
+
+We use the predict() function to predict the class membership of new test samples from an external study - Swains. Specifically, wrain the MINT model on the remaining 6 GBR sectors, then predict on the Swains sector. This process exactly reflects the inner workings of the tune() and perf() functions using LOGOCV. Here during our model training on the six sectors, we will set the parameters (i.e. choose ncomp and keepX) as in the tuning steps previously, using the model ***final.mint.splsda.open.closed.sector_no_Swains***.
+
+```{r MINT sPLS-DA predictions on an external study example code from the mixOmics textbook, eval=FALSE, message = FALSE, warning=FALSE, echo=TRUE}
+# We predict on study 3
+indiv.test <- which(study == "3")
+
+# We train on the remaining studies, with pre-tuned parameters
+mint.splsda.stem2 <- mint.splsda(X = X[-c(indiv.test), ],
+Y = Y[-c(indiv.test)],
+study = droplevels(study[-c(indiv.test)]),
+ncomp = 1,
+keepX = 30)
+mint.predict.stem <- predict(mint.splsda.stem2, newdata = X[indiv.test, ],
+dist = "centroids.dist",
+study.test = factor(study[indiv.test]))
+
+# Store class prediction with a model with 1 comp
+indiv.prediction <- mint.predict.stem$class$centroids.dist[, 1]
+
+# The confusion matrix compares the real subtypes with the predicted subtypes
+conf.mat <- get.confusion_matrix(truth = Y[indiv.test],
+predicted = indiv.prediction)
+conf.mat
+```
+
+```{r MINT sPLS-DA predictions on Swains, fig.height=4, fig.width=6, fig.cap="", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# =============================================
+# MINT sPLS-DA Prediction on External Dataset (Swains)
+# =============================================
+
+# --------------------------------------------
+# Step 1: Prepare the Swains test data (CLR-transformed)
+# --------------------------------------------
+# CLR transform (if not already done)
+pMAGs_95ANI_phyloseq_clr_Swains_only <- microbiome::transform(pMAGs_95ANI_phyloseq_Swains_only, transform = "clr")
+
+# Extract OTU table (MAGs) and transpose to samples x features
+MAGs_Swains_only <- as.data.frame(
+  pMAGs_95ANI_phyloseq_clr_Swains_only@otu_table
+)
+MAGs_Swains_only <- t(MAGs_Swains_only)
+
+# 1. Extract TRUE labels (Open_or_Closed_to_fishing) from phyloseq
+true_labels_Swains <- pMAGs_95ANI_phyloseq_clr_Swains_only@sam_data$Open_or_Closed_to_fishing
+# 2. Ensure true_labels_Swains is a factor (if not already)
+true_labels_Swains <- factor(true_labels_Swains)
+
+# Ensure the feature names match the training data
+# (If needed, align columns with the model's feature space)
+MAGs_Swains_only <- MAGs_Swains_only[, colnames(final.mint.splsda.open.closed.sector_no_Swains$X)]
+
+# --------------------------------------------
+# Step 2: Define test indices (Swains samples)
+# --------------------------------------------
+study.test <- factor(rep("06_Swains", nrow(MAGs_Swains_only)))
+# 5. Sync factor levels with training data (critical for MINT)
+levels(study.test) <- levels(final.mint.splsda.open.closed.sector_no_Swains$study)
+
+# --------------------------------------------
+# Step 3: Predict on Swains using the pre-trained MINT model
+# --------------------------------------------
+mint.predict.Swains <- predict(
+  final.mint.splsda.open.closed.sector_no_Swains,  # Your pre-trained model
+  newdata = MAGs_Swains_only,                     # Swains test data
+  dist = "centroids.dist",                        # Distance metric
+  study.test = study.test          # Study assignment for test data
+)
+
+# --------------------------------------------
+# Step 4: Extract predictions and evaluate
+# --------------------------------------------
+# Get predicted classes (using the first two components)
+indiv.prediction <- mint.predict.Swains$class$centroids.dist[, 2]
+
+# Confusion matrix (if true labels are available)
+conf.mat <- get.confusion_matrix(
+  truth = true_labels_Swains,           # True labels for Swains
+  predicted = indiv.prediction     # Predicted labels
+)
+
+# Print confusion matrix
+print(conf.mat)
+
+# Calculate accuracy
+accuracy <- sum(diag(conf.mat)) / sum(conf.mat)
+print(paste("Accuracy:", round(accuracy, 3)))
+```
+
+# Analysis for tre IMOS GBR-MGD database paper (***Robbins et al. 2025***) - we only want the top 60 most discriminatory
+
+```{r MINT sPLS-DA open closed final model sector Steve, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+final.mint.splsda.open.closed.sector.DB_paper <- mint.splsda(X = MAGs,
+                                             Y = pMAGs_95ANI_phyloseq_clr@sam_data$Open_or_Closed_to_fishing,
+#                                             keepX = tune.mint.spls_da.optimal.keepX.sector,
+                                             keepX = c(60, 10), # Uncomment for arbitrary number of features
+                                             study = pMAGs_95ANI_phyloseq_clr@sam_data$SECTOR_N_S,
+                                             ncomp = 2) # based on the BER
+perf.final.mint.splsda.open.closed.sector.DB_paper <- perf(final.mint.splsda.open.closed.sector.DB_paper)
+```
+
+```{r MINT sPLS-DA error rates within sectors, fig.height=6, fig.width=8, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# Initialize an empty list to store the results
+study_errors_overall <- list()
+
+# Loop through each study in the 'study.specific.error' section
+for (study_name in names(perf.final.mint.splsda.open.closed.sector.DB_paper[["study.specific.error"]])) {
+  # Extract the error rate for the current study
+  study_error_overall <- perf.final.mint.splsda.open.closed.sector.DB_paper$study.specific.error[[study_name]]$overall
+  
+  # Add the study name as a column to the error data
+  study_error_with_name_overall <- cbind(Study = study_name, study_error_overall)
+  
+  # Store the error data in the list
+  study_errors_overall[[study_name]] <- study_error_with_name_overall
+}
+
+# Combine all study data into a single data frame
+study_error_df_overall <- do.call(rbind, study_errors_overall)
+
+# Display the table
+knitr::kable(as.data.frame(study_error_df_overall), caption = "MINT sPLS-DA - error rate (centroids distance) across GBR sectors")
+```
+
+```{r DB paper MINT sPLS-DA error rate within sectors and separately for C and O, fig.height=6, fig.width=8, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# Initialize an empty list to store the results
+study_errors <- list()
+
+# Loop through each study in the 'study.specific.error' section
+for (study_name in names(perf.final.mint.splsda.open.closed.sector.DB_paper[["study.specific.error"]])) {
+  # Extract the error rate for the current study
+  study_error <- perf.final.mint.splsda.open.closed.sector.DB_paper$study.specific.error[[study_name]]$error.rate.class$centroids.dist
+  
+  # Add the study name as a column to the error data
+  study_error_with_name <- cbind(Study = study_name, study_error)
+  
+  # Store the error data in the list
+  study_errors[[study_name]] <- study_error_with_name
+}
+
+# Combine all study data into a single data frame
+study_error_df <- do.call(rbind, study_errors)
+
+# Display the table
+knitr::kable(as.data.frame(study_error_df), caption = "MINT sPLS-DA - error rate (centroids distance) across GBR sectors, and separately for C and O")
+```
+
+```{r Mint spls da model accuracy, fig.height=5, fig.width=8, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, results='hide', fig.show='hide'}
+# Is there a disconnect between the value I see here and in those mixOmics tuning plots? If yes, check if that is normal or weird
+final.mint.splsda.open.closed.sector.DB_paper_model_performance <- auroc(final.mint.splsda.open.closed.sector.DB_paper, roc.comp = 1, print = FALSE)
+final.mint.splsda.open.closed.sector.DB_paper_model_performance$Comp1
+```
+
+```{r Steve MINT sPLS-DA sample plot open closed, fig.cap="Sample plot from the MINT sPLS-DA performed on the IMOS-MGD seawater MAGs to identify microbes that discriminate between reefs that are open or closed to fishing. Samples (reef sites) are projected into the MINT sPLS-DA space spanned by the first two components, and coloured by their corresponding category reflecting reef protection level. Symbols indicate the membership to an LTMP trip/transect. Component 1 discriminates between the two reef categories.", fig.height=5, fig.width=8, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, results='hide', fig.show='hide'}
+plotIndiv(final.mint.splsda.open.closed.sector.DB_paper,
+          study = "global",
+          comp = c(1,2), # We can look into comp 3 too, but I think 2 dimensions are enough
+          legend = TRUE,
+          col.per.group = c("seagreen3", # Closed to fishing
+                            "steelblue4"), # open to fishing
+          title = 'MINT sPLS-DA using IMOS GBR-MGD MAGs | PCs 1-2',
+          subtitle = 'Reefs that are open or closed to fishing', ellipse = T)
+```
+
+
+```{r MINT sPLS-DA sample plot open closed Steve, fig.cap="Sample plot from the MINT sPLS-DA performed on the IMOS-MGD seawater MAGs to identify microbes that discriminate between reefs that are open or closed to fishing. Samples (reef sites) are projected into the MINT sPLS-DA space spanned by the first two components, and coloured by their corresponding category reflecting reef protection level. Symbols indicate the membership to an LTMP trip/transect. Component 1 discriminates between the two reef categories.", fig.height=5, fig.width=9, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, results='hide', fig.show='hide'}
+# Since Steve asked me NOT to plot the sectors as symbols, I had to plot it externally in ggplot2, and not using mixOMics
+variates_data <- as.data.frame(final.mint.splsda.open.closed.sector.DB_paper$variates$X)
+variates_data$Group <- final.mint.splsda.open.closed.sector.DB_paper$Y
+
+# Flom the previous plot, adding manually how much variance is explained on MINT sPLS-DA dimensions 1 and 2
+explained_var1 <- 0.23 # Replace with actual value for comp1
+explained_var2 <- 0.05 # Replace with actual value for comp2
+
+ggplot(variates_data, aes(x = comp1, y = comp2, color = Group, fill = Group)) +
+  geom_point() +
+  stat_ellipse(aes(color = Group), geom = "path", linewidth = 1) + # Change to "path" for lines
+#  stat_ellipse(geom = "polygon", alpha = 0.1, aes(fill = factor(Group)), color = NA) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black", alpha = 0.3) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black", alpha = 0.3) +
+  scale_color_manual(values = c("seagreen3", "steelblue4")) + # Coloring the points
+  scale_fill_manual(values = c("seagreen3", "steelblue4")) + # Coloring the ellipses
+  labs(x = paste('X-variate 1 (Variance Explained: ', explained_var1 * 100, '%)', sep = ''),
+       y = paste('X-variate 2 (Variance Explained: ', explained_var2 * 100, '%)', sep = ''),
+       title = 'MINT sPLS-DA using the 876 IMOS GBR-MGD pMAGs (95% ANI) | PCs 1-2',
+       subtitle = 'top 60 most discriminatory pMAGs') +
+  theme_minimal()
+```
+
+```{r Loading plots per sector DB paper, fig.height=30, fig.width=30, fig.cap="Loading plots of the MAGs selected by the MINT sPLS-DA on component 1 to discriminate between reefs that are open and closed to fishing, across sampling trips. Each plot represents one IMOS GBR-MGD transect, and the indicator MAGs are coloured according to the reef type (open or closed) they are maximally expressed in, on average. The length of the bars indicate the loading coefficient values that define the component. Several MAGs distinguish between reefs that are open or closed to fishing, and are consistently overexpressed in these samples across all sampling transects. The top 30 most influential/discriminant MAGs (on component 1) are shown.", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, results='hide', fig.show='hide'}
+loading.plots.open.closed.per.sector.Steve <- plotLoadings(final.mint.splsda.open.closed.sector.DB_paper,
+             contrib = "max",
+             method = 'mean',
+             comp=1,
+             legend = TRUE,
+             legend.color = c("seagreen3", # Closed
+                              "steelblue4"), # Open
+#             ndisplay = 60,
+             name.var = MAGs.name.short,
+             study="all.partial",
+             title="Contribution on comp 1",
+#             subtitle = paste("Study",1:4)
+             )
+loading.plots.open.closed.per.sector.Steve
+```
+
+We can also look at the averaged contribution across MINT studies (sectors):
+
+```{r Loading plots all sectors together DB paper, fig.height=20, fig.width=15, fig.cap="Loading plots of the pMAGs selected by the MINT sPLS-DA on component 1 to discriminate between reefs that are open and closed to fishing, across sampling trips. The length of the bars indicate the loading coefficient values that define the component. Several MAGs distinguish between reefs that are open or closed to fishing, and are consistently overexpressed in these samples across all sampling transects. The top 60 most influential/discriminant MAGs (on component 1) are shown.", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, results='hide', fig.show='hide'}
+loading.plots.open.closed.across.sectors.DB <- plotLoadings(final.mint.splsda.open.closed.sector.DB_paper,
+             contrib = "max",
+             method = 'mean',
+             comp=1,
+             legend = TRUE,
+             legend.color = c("seagreen3", # Closed
+                              "steelblue4"), # Open
+             ndisplay = 60,
+             name.var = MAGs.name.short,
+#             study="all.partial",
+             title="Contribution on comp 1",
+#             subtitle = paste("Study",1:4)
+             )
+loading.plots.open.closed.across.sectors.DB
+```
+
+# Saving the R object (for downstream analysis)
+
+```{r Save an R object, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+save.image(file = "/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/cleaned_code/Figure_2/Figure_2.RData")
+```
+
+The final map (Fig. 2) was created in Inkscape.

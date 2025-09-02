@@ -1,0 +1,1086 @@
+---
+title: "Figure 1"
+subtitle: "R code to replicate the analysis"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+documentclass: article
+mainfont: Lato
+output:
+  html_document:
+    code_folding: show
+    collapse: no
+    df_print: paged
+    fig_caption: yes
+    fig_height: 4
+    fig_width: 4
+    highlight: textmate
+    theme: united
+    toc: yes
+    toc_float: yes
+    css: "/home/marko-terzin/Documents/PhD/Thesis/Chapter_2/Data_analysis/Seawater/testing_Igor_Antti_R_script/All_seawater_full_dataset/resources/ws_style.css"  
+  pdf_document:
+    toc: yes
+    toc_depth: 3
+    number_sections: yes
+    df_print: kable
+    fig_caption: true
+    highlight: zenburn
+    latex_engine: xelatex 
+  word_document:
+#    fig_caption: yes
+#    fig_height: 4
+#    fig_width: 4
+#    highlight: tango
+    toc: yes
+#    toc_depth: 2  
+# bibliography: ../resources/references.bib
+fontsize: 11pt
+geometry: margin=1in
+classoption: a4paper
+abstract: This is the code to make the map presented as Fig. 1. 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r Loading libraries, results = "hide", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# First checking if I have the packages I need, and installing if not
+list.of.packages <- c("tidyverse", "gplots", "RColorBrewer", "networkD3", "vegan", "rstatix", 
+                      "ggalluvial", "gridExtra", "propr", "patchwork", "phyloseq", "dplyr", 
+                      "VennDiagram", "plyr", "data.table", "vsn", "pheatmap", "ggpubr", 
+                      "microbiome", "rmarkdown", "mixOmics", "NetCoMi", "igraph", "randomForest", 
+                      "caret", "pdp", "rstatix")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+
+# Installing some separately:
+# phyloseq
+# if (!requireNamespace("BiocManager", quietly = TRUE))
+# install.packages("BiocManager")
+
+# BiocManager::install("phyloseq")
+
+# DESeq2
+# BiocManager::install("DESeq2")
+
+# vsn
+# BiocManager::install("vsn")
+
+# Had issues installing tidyverse, so I followed this first (insttalled some dependencies from the terminal) and then it worked: https://community.rstudio.com/t/tidyverse-package-does-not-install/162507/6
+library(tidyverse)
+library(gplots)
+library(RColorBrewer)
+library(ggrepel)
+library(units)
+library(future) # Needed to use multiple processors
+library(furrr) # Needed to use multiple processors
+library(progressr) # to track the progress
+library(networkD3) # for Sankey diagrams
+library(vegan)
+library(rstatix)
+library(parallel) # for setting multiple CPUs
+library(ggalluvial) # to create alluvial diagrams
+library(gridExtra)
+# library(propr) # to compute the proportionality metric!
+library(patchwork)
+library(phyloseq)
+library(ggnewscale)
+library(dplyr)
+library(VennDiagram)
+# if (!require(devtools)) install.packages("devtools")
+# devtools::install_github("gaospecial/ggVennDiagram")
+library(ggVennDiagram)
+library(ggvenn)
+library(plyr) # Needed for the ordination plots I did on my own
+library(data.table) # For data wrangling
+library(vsn) # For normalization
+# library(psych) # Used to investigate correlations among predictors in RDA analysis, ran in vegan
+library(RColorBrewer)
+library(pheatmap)
+library(ggpubr) # has ggarrange
+# EcolUtils by Guillem Salazar
+library(devtools)
+# devtools::install_github("GuillemSalazar/EcolUtils")
+library(EcolUtils)
+# Install pairwiseAdonis
+# devtools::install_github("pmartinezarbizu/pairwiseAdonis/pairwiseAdonis")
+library(pairwiseAdonis)
+# install.packages("remotes")
+# remotes::install_github("microbiome/microbiome")
+library(microbiome)
+# install.packages("rmarkdown")
+library(rmarkdown)
+library(mixOmics)
+# Installing the most important package - mixOmics!
+# Install mixOmics
+# BiocManager::install('mixOmics')
+# library(pairwiseAdonis)
+
+# Installing the NetCoMi package I will need for microbial networks: https://github.com/stefpeschel/NetCoMi
+# install.packages("devtools")
+# install.packages("BiocManager")
+library(doParallel)
+library(foreach)
+# Install NetCoMi
+# devtools::install_github("stefpeschel/NetCoMi", 
+#                         dependencies = c("Depends", "Imports", "LinkingTo"),
+#                         repos = c("https://cloud.r-project.org/",
+#                                   BiocManager::repositories()))
+library(NetCoMi)
+library(igraph) # needed for the function below: read_graph
+# Now installing propr - to compute proportionality metric (microbial networks)
+# devtools::install_github("tpq/propr")
+# library(propr)
+
+# For random forest models:
+library(randomForest)
+library(caret)  # For data splitting and model evaluation
+library(pdp)
+
+# Packages I need for the map:
+library(reshape2) # This is only needed for the melt funtion
+library(reshape)
+library(dplyr)
+library(plyr)
+library(data.table)
+library(ggplot2)
+library(rworldmap)
+library(rworldxtra)
+# library(ggsn)
+library(sf)
+library(raster)
+library(terra)
+# library(rgeos)
+# library(maps)
+# library(maptools)
+library(grid)
+library(miscTools)
+library(stringr)
+library(ggpubr)
+library(plyr)
+library(gridExtra) # for arranging plots
+
+# Loading all the libraries
+library(raster)
+library(phyloseq)
+library(tidyverse)
+library(ggspatial)
+library(ggrepel) # The package ggrepel offers a very flexible approach to deal with label placement (with geom_text_repel and 
+# geom_label_repel), including automated movement of labels in case of overlap
+# Installing AIMS packages individually
+library(remotes) # Needed to install the AIMS R packages below
+# remotes::install_github("https://github.com/open-AIMS/dataaimsr")
+library(dataaimsr)
+# remotes::install_github("https://github.com/open-AIMS/gisaimsr")
+library(gisaimsr)
+library(sp)
+
+# Importing the R object
+# load("/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/MINT_sPLS_876_MAGs_Aug_2024.RData")
+
+# Setting the work directory
+setwd("/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs")
+```
+
+```{r Making the full IMOS GBR MGD map, fig.width = 7, fig.height = 7, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# Import csv file containing coordinates
+coords_data = read.csv("/home/marko-terzin/Documents/PhD/Thesis/Chapter_2/Data_analysis/Seawater/testing_Tom_Jenkins_script/all_IMOS-MGD_seawater_subset/Metadata_files/MARKO_for_eReefs_Lats_Longs_for_map_piecharts.csv")
+
+# ------------------------------------------------------------------------------------------------------------ #
+# First making an 'empty' map as foundation when coupling with ENV measurements / Taxa-Function info
+# ------------------------------------------------------------------------------------------------------------ #
+
+# Importing the coordinates
+map_coords <- read.csv("/home/marko-terzin/Documents/PhD/Thesis/Chapter_2/Data_analysis/Seawater/testing_Tom_Jenkins_script/all_IMOS-MGD_seawater_subset/Metadata_files/MARKO_for_eReefs_Lats_Longs.csv")
+# View(map_coords)
+
+# Now converting from data frame into sf format
+map_coords <- st_as_sf(map_coords, 
+                       coords = c("lon", "lat"), 
+                       remove = FALSE, 
+                       crs = 4283, # this is the reference code for the CRS system GDA94, used by dataaimsr & gisaimsr R packages
+                       agr = "constant")
+
+# This is the final metadata_with_reef_names_maps file, with average values of env. measurements (averaged per Reef site)
+metadata_with_reef_names_maps <- read.csv(file = "/home/marko-terzin/Documents/PhD/Thesis/Chapter_2/Data_analysis/Seawater/00_FINAL_PIPELINE/01_Preparation_of_Environmental_Metadata/metadata_with_reef_names_maps.csv")
+
+### 2 ### Renaming the sampling trips to include dates, and make sure they are ordered alphabetically
+# First trip
+metadata_with_reef_names_maps$Sampling_trip <- gsub("First", # String to search for
+                               "Trip_01_Nov-Dec_2019", # Replace with this
+                               as.character(metadata_with_reef_names_maps$Sampling_trip)) # Column to search in
+
+# Second trip
+metadata_with_reef_names_maps$Sampling_trip <- gsub("Second", # String to search for
+                               "Trip_02_January_2020", # Replace with this
+                               as.character(metadata_with_reef_names_maps$Sampling_trip)) # Column to search in
+
+# Third trip
+metadata_with_reef_names_maps$Sampling_trip <- gsub("Third", # String to search for
+                               "Trip_03_February_2020", # Replace with this
+                               as.character(metadata_with_reef_names_maps$Sampling_trip)) # Column to search in
+
+# Fourth trip
+metadata_with_reef_names_maps$Sampling_trip <- gsub("Fourth", # String to search for
+                               "Trip_04_July_2020", # Replace with this
+                               as.character(metadata_with_reef_names_maps$Sampling_trip)) # Column to search in
+
+# Merging with 'Sampling trip' info
+map_coords <- left_join(map_coords, metadata_with_reef_names_maps, by = c("name" = "REEF_NAME"))
+# Let's also add the sector info! Found here: MINT_sector_manually_edited
+# map_coords <- left_join(map_coords, MINT_sector_manually_edited %>% dplyr::select(REEF_NAME, SECTOR), by = c("name" = "REEF_NAME"))
+
+# Reef 21-580 is actually a fished reef! I corrected for that manually in file = "/home/marko-terzin/Documents/PhD/Thesis/Chapter_2/Data_analysis/Seawater/00_FINAL_PIPELINE/01_Preparation_of_Environmental_Metadata/metadata_with_reef_names_maps.csv"
+
+oz_cities <- read.csv("~/Documents/PhD/Thesis/Chapter_2/Data_analysis/Seawater/testing_Tom_Jenkins_script/all_IMOS-MGD_seawater_subset/Input_files/oz_cities.csv")
+
+
+#########################
+# Now plotting
+
+# But it might be better not to plot the mainland - I am just losing precious space
+gbr_no_mainland <- gbr_feat %>%
+  dplyr::filter(FEAT_NAME != "Mainland")
+
+# Let's color per trip - to distinguish between summer and winter samples  
+col.per.trip <- factor(map_coords$Sampling_trip, levels = c("Trip_01_Nov-Dec_2019",
+                                                            "Trip_02_January_2020",
+                                                            "Trip_03_February_2020",
+                                                            "Trip_04_July_2020"))
+colors <- c("indianred", # Sampling trip 1
+            "indianred4", # Sampling trip 2 
+            "red3", # Sampling trip 3
+            "slateblue") # Sampling trip 4
+names(colors) <- c("Trip_01_Nov-Dec_2019",
+                   "Trip_02_January_2020",
+                   "Trip_03_February_2020",
+                   "Trip_04_July_2020")
+
+# I also want to have symbols for sectors- consistent with all the other plots:
+# Custom sector shapes
+sector_shapes <- c(
+  "CG" = 16,
+  "PC" = 17,
+  "SW" = 18,
+  "CA" = 15,
+  "CB" = 25,
+  "TO" = 3,
+  "IN" = 4
+)
+
+# Plotting
+IMOS_MGD_dots_trip <- ggplot(data = gbr_feat) +
+  # Reef polygons (no outline)
+  geom_sf(
+    data = gbr_feat,
+    lwd = 0.01,
+    fill = "seashell2",
+    colour = NA
+  ) +
+  # Sampling sites (colored by trip AND shaped by sector)
+  geom_sf(
+    data = map_coords,
+    aes(color = Sampling_trip, shape = SECTOR),  # Added shape mapping
+    size = 3,  # Slightly larger points for clarity
+    show.legend = "point"
+  ) +
+  # Map bounds
+  coord_sf(xlim = c(142, 154), ylim = c(-10, -27)) +
+  # Scale bar
+  annotation_scale(
+    location = "bl",
+    width_hint = 0.5,
+    pad_x = unit(0.5, "cm"),
+    pad_y = unit(0.5, "cm")
+  ) +
+  # City labels (repelled)
+  geom_text_repel(
+    data = oz_cities,
+    aes(x = Longitude, y = Latitude, label = Town),
+    fontface = "bold",
+    size = 3.2,
+    col = "black",
+    nudge_x = c(-0.5, -0.9, -0.5, -0.8, -0.5, -0.7),
+    nudge_y = c(-0.5, 0.5, -0.5, -0.5, -0.5, -0.5)
+  ) +
+  # Color scale for trips AND shape scale for sectors
+  scale_color_manual(
+    name = "Dates of Sampling Transects",
+    values = colors
+  ) +
+  scale_shape_manual(  # Added to map sectors to shapes
+    name = "Sector",
+    values = sector_shapes,
+    breaks = names(sector_shapes)  # Ensure all shapes appear in legend
+  ) +
+  # Theme and labels
+  theme_classic() +
+  theme(
+    panel.background = element_rect(
+      fill = "lightblue3",
+      colour = "lightblue3",
+      size = 0.5,
+      linetype = "solid"
+    ),
+    legend.direction = "vertical",
+    legend.box = "vertical",
+    legend.key = element_blank()  # Cleaner legend keys
+  ) +
+  labs(
+    x = "Longitude",
+    y = "Latitude",
+    title = "IMOS-MGD",
+    subtitle = "Microbial Genomics Database sites"
+  ) +
+  guides(
+    color = guide_legend(order = 1),  # Sampling trips first
+    shape = guide_legend(order = 2)   # Sectors second
+  )
+# Let's take a look:
+IMOS_MGD_dots_trip
+
+# Let's save this as pdf:
+ggsave(
+  filename = "IMOS_GBR-MGD_Sampling_Map.pdf",
+  plot = IMOS_MGD_dots_trip,
+  device = cairo_pdf,  # Ensures best font/vector quality
+  width = 7,          # Width in inches (A4 paper is 8.27")
+  height = 7,         # Height in inches
+  units = "in",       # Units for width/height
+  dpi = 300           # Only affects raster elements (if any)
+)
+```
+
+
+```{r Making the within the trip maps to show zoning, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, fig.width=10, fig.height=8}
+# ---------------------------------------------------------------------------------------------------------------------------- #
+# IMOS-MGD Maps within trips - color reefs if they are open or closed to fishing
+# ---------------------------------------------------------------------------------------------------------------------------- #
+
+# I can use this for all sites
+col.open.closed <- factor(map_coords$Open_or_Closed_to_fishing, levels = c("C",
+                                                                           "O"))
+colors.open.closed <- c("seagreen", # Closed to fishing
+                       "steelblue4") # open to fishing
+names(colors.open.closed) <- c("C",
+                               "O")
+
+# But need to split map_coords file per trip
+map_coords_trip1 <- filter(map_coords, Sampling_trip=="Trip_01_Nov-Dec_2019")
+map_coords_trip2 <- filter(map_coords, Sampling_trip=="Trip_02_January_2020")
+map_coords_trip3 <- filter(map_coords, Sampling_trip=="Trip_03_February_2020")
+map_coords_trip4 <- filter(map_coords, Sampling_trip=="Trip_04_July_2020")
+```
+
+
+```{r Trip 1 zoning map, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, fig.width=10, fig.height=8}
+# 1. Filter zones to ONLY include your target zones - VERIFY THESE NAMES FIRST!
+zone_names <- c("Marine National Park", "Habitat Protection", "Conservation Park")
+gbr_zoning_filtered <- gbr_zoning %>% 
+  filter(TYPE %in% zone_names)
+
+# 2. Define EXACT colors (using hex codes for reliability)
+zone_colors <- c(
+  "Marine National Park" = "#2E8B57",       # seagreen
+  "Habitat Protection" = "#36648B",         # steelblue4 
+  "Conservation Park" = "#FFF68F"           # khaki1
+)
+
+# 3. FULL PLOT CODE
+IMOS_MGD_trip1 <- ggplot() +
+  # A. ZONES LAYER (filtered and colored)
+  geom_sf(
+    data = gbr_zoning_filtered,
+    aes(fill = TYPE),
+    colour = NA,
+    alpha = 0.8
+  ) +
+  scale_fill_manual(
+    name = "Reef Zone",
+    values = zone_colors,
+    breaks = names(zone_colors),
+    guide = guide_legend(order = 1)
+  ) +
+  
+  # B. REEF STRUCTURES
+  geom_sf(
+    data = gbr_feat,
+    lwd = 0.01,
+    fill = "seashell2",
+    colour = NA
+  ) +
+  
+  # C. SAMPLING SITES (with outlines)
+  geom_sf(
+    data = map_coords_trip1,
+    aes(color = Open_or_Closed_to_fishing, shape = SECTOR),
+    size = 3.5,
+    stroke = 0.8,
+    fill = "white",
+    show.legend = "point"
+  ) +
+  
+  # D. REEF LABELS (NEW: white background boxes)
+  geom_label_repel(
+    data = map_coords_trip1,
+    aes(x = lon, y = lat, label = name, color = Open_or_Closed_to_fishing),
+    fontface = "bold",
+    size = 3.2,
+    label.padding = unit(0.15, "lines"),
+    label.r = unit(0.15, "lines"),
+    label.size = 0.4,  # Outline thickness
+    fill = "white",
+    alpha = 0.8,
+    segment.color = "black",
+    segment.alpha = 0.6,
+    segment.size = 0.1,
+    nudge_x = c(1.2, 1.2, 1.2, 1.2, 0.9, 0.6, 0.4, -0.2, 0.4, -0.1),
+    nudge_y = c(0.2, 0.1, 0.1, 0.1, 0.2, -0.3, 0.2, -0.8, 0.3, -0.6)
+  ) +
+  
+  # E. MAP DECORATIONS
+  annotation_scale(
+    location = "bl",
+    width_hint = 0.3,
+    pad_x = unit(0.5, "cm"),
+    pad_y = unit(0.8, "cm")
+  ) +
+  annotation_north_arrow(
+    location = "bl",
+    which_north = "true",
+    pad_x = unit(0.5, "cm"),
+    pad_y = unit(0.5, "cm"),
+    height = unit(0.8, "cm"),
+    width = unit(0.8, "cm"),
+    style = north_arrow_fancy_orienteering
+  ) +
+  
+  # F. COORDINATES
+  coord_sf(xlim = c(143, 145), ylim = c(-15, -11)) +
+  
+  # G. COLOR/SHAPE SCALES (updated for outlined symbols)
+  scale_color_manual(
+    name = "Protection Status",
+    values = colors.open.closed,
+    guide = guide_legend(
+      order = 2,
+      override.aes = list(shape = 21, stroke = 0.8, fill = "white")
+    )
+  ) +
+  scale_shape_manual(
+    name = "Sector",
+    values = c(
+      "CG" = 16,
+      "PC" = 17,
+      "SW" = 18,
+      "CA" = 15,
+      "CB" = 19,
+      "TO" = 3,
+      "IN" = 4
+      ),
+    guide = guide_legend(
+      order = 3,
+      override.aes = list(stroke = 0.8, fill = "white", color = "black")
+    )
+  ) +
+  
+  # H. THEME
+  theme_classic() +
+  theme(
+    panel.background = element_rect(fill = "lightblue3", colour = "lightblue3"),
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5),
+    legend.direction = "vertical",
+    legend.box = "vertical",
+    legend.spacing.y = unit(0.2, "cm"),
+    legend.key = element_rect(fill = "white")
+  ) +
+  labs(
+    x = "Longitude (°E)",
+    y = "Latitude (°S)",
+    title = "IMOS Microbial Genomics Database - Transect 1",
+    subtitle = "Colored by reef zoning and protection status (Nov-Dec 2019)"
+  )
+
+# View plot
+IMOS_MGD_trip1
+
+# Save as PDF
+ggsave(
+  "IMOS_MGD_Trip1_Map.pdf",
+  plot = IMOS_MGD_trip1,
+  device = cairo_pdf,
+  width = 8,
+  height = 6,
+  dpi = 300
+)
+```
+
+```{r Trip 2 zoning map, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, fig.width=8, fig.height=7}
+# 3. FULL PLOT CODE FOR TRIP 2
+IMOS_MGD_trip2 <- ggplot() +
+  # A. ZONES LAYER (filtered and colored)
+  geom_sf(
+    data = gbr_zoning_filtered,
+    aes(fill = TYPE),
+    colour = NA,
+    alpha = 0.8
+  ) +
+  scale_fill_manual(
+    name = "Reef Zone",
+    values = zone_colors,
+    breaks = names(zone_colors),
+    guide = guide_legend(order = 1)
+  ) +
+  
+  # B. REEF STRUCTURES
+  geom_sf(
+    data = gbr_feat,
+    lwd = 0.01,
+    fill = "seashell2",
+    colour = NA
+  ) +
+  
+  # C. SAMPLING SITES (with outlines)
+  geom_sf(
+    data = map_coords_trip2,
+    aes(color = Open_or_Closed_to_fishing, shape = SECTOR),
+    size = 3.5,
+    stroke = 0.8,  # Outline thickness
+    fill = "white", # For shapes 21-25
+    show.legend = "point"
+  ) +
+  
+  # D. REEF LABELS (with white background)
+  geom_label_repel(
+    data = map_coords_trip2,
+    aes(x = lon, y = lat, label = name, color = Open_or_Closed_to_fishing),
+    fontface = "bold",
+    size = 3.2,
+    label.padding = unit(0.15, "lines"),
+    label.size = 0.4,  # Outline thickness
+    fill = "white",
+    alpha = 0.8,
+    segment.color = "black",
+    segment.alpha = 0.6,
+    segment.size = 0.1,
+    nudge_x = c(-0.1, -0.4, 0.3, 0.3, -0.2, 0.4, 0.1, -0.5, 0.4, -0.1, 0.2, -0.3),
+    nudge_y = c(-0.1, -0.1, 0.2, -0.1, 0.2, 0.2, 0.2, -0.3, 0.2, -0.6, 0.4, 0.1)
+  ) +
+  
+  # E. MAP DECORATIONS
+  annotation_scale(
+    location = "bl",
+    width_hint = 0.3,
+    pad_x = unit(0.5, "cm"),
+    pad_y = unit(0.8, "cm")
+  ) +
+  annotation_north_arrow(
+    location = "bl",
+    which_north = "true",
+    pad_x = unit(0.5, "cm"),
+    pad_y = unit(0.5, "cm"),
+    height = unit(0.8, "cm"),
+    width = unit(0.8, "cm"),
+    style = north_arrow_fancy_orienteering
+  ) +
+  
+  # F. COORDINATES (Trip 2 extent)
+  coord_sf(xlim = c(151, 153), ylim = c(-24, -21.5)) +
+  
+  # G. COLOR/SHAPE SCALES
+  scale_color_manual(
+    name = "Protection Status",
+    values = colors.open.closed,
+    guide = guide_legend(
+      order = 2,
+      override.aes = list(shape = 21, stroke = 0.8, fill = "white")
+    )
+  ) +
+  scale_shape_manual(
+    name = "Sector",
+    values = c(
+      "CG" = 16,
+      "PC" = 17,
+      "SW" = 18,
+      "CA" = 15,
+      "CB" = 19,
+      "TO" = 3,
+      "IN" = 4
+      ),
+    guide = guide_legend(
+      order = 3,
+      override.aes = list(stroke = 0.8, fill = "white", color = "black")
+    )
+  ) +
+  
+  # H. THEME
+  theme_classic() +
+  theme(
+    panel.background = element_rect(fill = "lightblue3", colour = "lightblue3"),
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5),
+    legend.direction = "vertical",
+    legend.box = "vertical",
+    legend.spacing.y = unit(0.2, "cm"),
+    legend.key = element_rect(fill = "white")
+  ) +
+  labs(
+    x = "Longitude (°E)",
+    y = "Latitude (°S)",
+    title = "IMOS Microbial Genomics Database - Transect 2",
+    subtitle = "Colored by reef zoning and protection status (January 2020)"
+  )
+
+# View plot
+IMOS_MGD_trip2
+
+# Save
+ggsave(
+  "IMOS_MGD_Trip2_Map.pdf",
+  plot = IMOS_MGD_trip2,
+  device = cairo_pdf,
+  width = 7,
+  height = 5,
+  dpi = 300
+)
+```
+
+```{r Zoomed within Trip 2, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, fig.width=8, fig.height=7}
+# 3. FULL PLOT CODE FOR TRIP 2
+IMOS_MGD_Swains_zoomed_in <- ggplot() +
+  # A. ZONES LAYER (filtered and colored)
+  geom_sf(
+    data = gbr_zoning_filtered,
+    aes(fill = TYPE),
+    colour = NA,
+    alpha = 0.8
+  ) +
+  scale_fill_manual(
+    name = "Reef Zone",
+    values = zone_colors,
+    breaks = names(zone_colors),
+    guide = guide_legend(order = 1)
+  ) +
+  
+  # B. REEF STRUCTURES
+  geom_sf(
+    data = gbr_feat,
+    lwd = 0.01,
+    fill = "seashell2",
+    colour = NA
+  ) +
+  
+  # C. SAMPLING SITES (with outlines)
+  geom_sf(
+    data = map_coords_trip2 %>% dplyr::filter(SECTOR == "SW" | name == "21-580"), # just selecting Swains
+    aes(color = Open_or_Closed_to_fishing, shape = SECTOR),
+    size = 3.5,
+    stroke = 0.8,  # Outline thickness
+    fill = "white", # For shapes 21-25
+    show.legend = "point"
+  ) +
+  
+  # D. REEF LABELS (with white background)
+  geom_label_repel(
+    data = map_coords_trip2 %>% dplyr::filter(SECTOR == "SW" | name == "21-580"), # just selecting Swains
+    aes(x = lon, y = lat, label = name, color = Open_or_Closed_to_fishing),
+    fontface = "bold",
+    size = 3.2,
+    label.padding = unit(0.15, "lines"),
+    label.size = 0.4,  # Outline thickness
+    fill = "white",
+    alpha = 0.8,
+    segment.color = "black",
+    segment.alpha = 0.6,
+    segment.size = 0.1,
+#    nudge_x = c(-0.1, -0.4, 0.3, 0.3, -0.2, 0.4, 0.1, -0.5, 0.4, -0.1, 0.2, -0.3),
+#    nudge_y = c(-0.1, -0.1, 0.2, -0.1, 0.2, 0.2, 0.2, -0.3, 0.2, -0.6, 0.4, 0.1)
+  ) +
+  
+  # E. MAP DECORATIONS
+  annotation_scale(
+    location = "bl",
+    width_hint = 0.3,
+    pad_x = unit(0.5, "cm"),
+    pad_y = unit(0.8, "cm")
+  ) +
+  annotation_north_arrow(
+    location = "bl",
+    which_north = "true",
+    pad_x = unit(0.5, "cm"),
+    pad_y = unit(0.5, "cm"),
+    height = unit(0.8, "cm"),
+    width = unit(0.8, "cm"),
+    style = north_arrow_fancy_orienteering
+  ) +
+  
+  # F. COORDINATES (Trip 2 extent)
+  coord_sf(xlim = c(152.2, 152.7), ylim = c(-22.1, -21.8)) +
+  
+  # G. COLOR/SHAPE SCALES
+  scale_color_manual(
+    name = "Protection Status",
+    values = colors.open.closed,
+    guide = guide_legend(
+      order = 2,
+      override.aes = list(shape = 21, stroke = 0.8, fill = "white")
+    )
+  ) +
+  scale_shape_manual(
+    name = "Sector",
+    values = c(
+      "CG" = 16,
+      "PC" = 17,
+      "SW" = 18,
+      "CA" = 15,
+      "CB" = 19,
+      "TO" = 3,
+      "IN" = 4
+      ),
+    guide = guide_legend(
+      order = 3,
+      override.aes = list(stroke = 0.8, fill = "white", color = "black")
+    )
+  ) +
+  
+  # H. THEME
+  theme_classic() +
+  theme(
+    panel.background = element_rect(fill = "lightblue3", colour = "lightblue3"),
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5),
+    legend.direction = "vertical",
+    legend.box = "vertical",
+    legend.spacing.y = unit(0.2, "cm"),
+    legend.key = element_rect(fill = "white")
+  ) +
+  labs(
+    x = "Longitude (°E)",
+    y = "Latitude (°S)",
+    title = "IMOS Microbial Genomics Database - Transect 2",
+    subtitle = "Colored by reef zoning and protection status (January 2020)"
+  )
+
+# View plot
+IMOS_MGD_Swains_zoomed_in
+
+# Save
+ggsave(
+  "IMOS_MGD_Trip2_Map_zoomed_in.pdf",
+  plot = IMOS_MGD_Swains_zoomed_in,
+  device = cairo_pdf,
+  width = 6,
+  height = 5,
+  dpi = 300
+)
+```
+
+```{r Calculating distance in metres between 21 580 and the green zone, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, fig.width=8, fig.height=7}
+# 1. Get reef 21-580 coordinates
+reef_21_580 <- map_coords_trip2 %>% dplyr::filter(name == "21-580")
+
+# 2. Filter green zones only
+green_zones <- gbr_zoning_filtered %>% dplyr::filter(TYPE == "Marine National Park")
+
+# 3. Transform both to projected CRS (e.g., UTM zone 55 for GBR)
+utm_crs <- 32755
+reef_utm <- st_transform(reef_21_580, utm_crs)
+green_zones_utm <- st_transform(green_zones, utm_crs)
+
+# 4. Find the nearest green zone polygon
+nearest_zone <- green_zones_utm[st_nearest_feature(reef_utm, green_zones_utm), ]
+# Check if nearest_zone has multiple features
+if (nrow(nearest_zone) > 1) {
+  # Calculate distances to all candidate zones
+  distances <- st_distance(reef_utm, nearest_zone)
+  # Find the actual nearest one
+  nearest_zone <- nearest_zone[which.min(distances), ]
+}
+
+# 5. Get nearest point on green zone boundary (ensure this returns just one line)
+nearest_point <- st_nearest_points(reef_utm, nearest_zone)
+
+# 6. Transform the line back to WGS84 for plotting
+nearest_line_wgs84 <- st_transform(nearest_point, 4326)
+
+# Ensure we only have one line (take first element if it's a multilinestring)
+if (inherits(nearest_line_wgs84, "sfc_MULTILINESTRING")) {
+  nearest_line_wgs84 <- st_line_merge(nearest_line_wgs84)  # Merge if it's a multilinestring
+  nearest_line_wgs84 <- st_cast(nearest_line_wgs84, "LINESTRING")[1]  # Take first linestring
+}
+
+# Distance in metres (returns a numeric scalar)
+distance_m <- as.numeric(st_distance(reef_utm, nearest_zone))
+
+# Print the actual distance
+print(paste("Minimum distance from reef 21-580 to green zone:", round(distance_m, 1), "m"))
+```
+
+```{r Trip 3 zoning map, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, fig.width=8, fig.height=7}
+# 3. FULL PLOT CODE FOR TRIP 3
+IMOS_MGD_trip3 <- ggplot() +
+  # A. ZONES LAYER (filtered and colored)
+  geom_sf(
+    data = gbr_zoning_filtered,
+    aes(fill = TYPE),
+    colour = NA,
+    alpha = 0.8
+  ) +
+  scale_fill_manual(
+    name = "Reef Zone",
+    values = zone_colors,
+    breaks = names(zone_colors),
+    guide = guide_legend(order = 1)
+  ) +
+  
+  # B. REEF STRUCTURES
+  geom_sf(
+    data = gbr_feat,
+    lwd = 0.01,
+    fill = "seashell2",
+    colour = NA
+  ) +
+  
+  # C. SAMPLING SITES (with outlines)
+  geom_sf(
+    data = map_coords_trip3,
+    aes(color = Open_or_Closed_to_fishing, shape = SECTOR),
+    size = 3.5,
+    stroke = 0.8,  # Outline thickness
+    fill = "white", # For shapes 21-25
+    show.legend = "point"
+  ) +
+  
+  # D. REEF LABELS (with white background)
+  geom_label_repel(
+    data = map_coords_trip3,
+    aes(x = lon, y = lat, label = name, color = Open_or_Closed_to_fishing),
+    fontface = "bold",
+    size = 3.2,
+    label.padding = unit(0.15, "lines"),
+    label.size = 0.4,  # Outline thickness
+    fill = "white",
+    alpha = 0.8,
+    segment.color = "black",
+    segment.alpha = 0.6,
+    segment.size = 0.1,
+    nudge_x = c(0.3, 0.3, 0.3, 0.3, 0.4, 0.4, 0.3, 0.3, 0.4, 0.4, 0.1, 0.3),
+    nudge_y = c(-0.1, 0.2, 0.2, 0.1, 0.2, 0.1, 0.1, 0.2, 0.1, -0.1, 0.2, -0.1)
+  ) +
+  
+  # E. MAP DECORATIONS
+  annotation_scale(
+    location = "bl",
+    width_hint = 0.3,
+    pad_x = unit(0.5, "cm"),
+    pad_y = unit(0.8, "cm")
+  ) +
+  annotation_north_arrow(
+    location = "bl",
+    which_north = "true",
+    pad_x = unit(0.5, "cm"),
+    pad_y = unit(0.5, "cm"),
+    height = unit(0.8, "cm"),
+    width = unit(0.8, "cm"),
+    style = north_arrow_fancy_orienteering
+  ) +
+  
+  # F. COORDINATES (Trip 3 extent)
+  coord_sf(xlim = c(145.4, 147), ylim = c(-18, -15.8)) +
+  
+  # G. COLOR/SHAPE SCALES
+  scale_color_manual(
+    name = "Protection Status",
+    values = colors.open.closed,
+    guide = guide_legend(
+      order = 2,
+      override.aes = list(shape = 21, stroke = 0.8, fill = "white")
+    )
+  ) +
+  scale_shape_manual(
+    name = "Sector",
+    values = c(
+      "CG" = 16,
+      "PC" = 17,
+      "SW" = 18,
+      "CA" = 15,
+      "CB" = 19,
+      "TO" = 3,
+      "IN" = 4
+    ),
+    guide = guide_legend(
+      order = 3,
+      override.aes = list(stroke = 0.8, fill = "white", color = "black")
+    )
+  ) +
+  
+  # H. THEME
+  theme_classic() +
+  theme(
+    panel.background = element_rect(fill = "lightblue3", colour = "lightblue3"),
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5),
+    legend.direction = "vertical",
+    legend.box = "vertical",
+    legend.spacing.y = unit(0.2, "cm"),
+    legend.key = element_rect(fill = "white")
+  ) +
+  labs(
+    x = "Longitude (°E)",
+    y = "Latitude (°S)",
+    title = "IMOS Microbial Genomics Database - Transect 3",
+    subtitle = "Colored by reef zoning and protection status (February 2020)"
+  )
+
+# View plot
+IMOS_MGD_trip3
+
+# Save
+ggsave(
+  "IMOS_MGD_Trip3_Map.pdf",
+  plot = IMOS_MGD_trip3,
+  device = cairo_pdf,
+  width = 9,
+  height = 7,
+  dpi = 300
+)
+```
+
+```{r Trip 4 zoning map, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, fig.width=8, fig.height=7}
+# 3. FULL PLOT CODE FOR TRIP 4
+IMOS_MGD_trip4 <- ggplot() +
+  # A. ZONES LAYER (filtered and colored)
+  geom_sf(
+    data = gbr_zoning_filtered,
+    aes(fill = TYPE),
+    colour = NA,
+    alpha = 0.8
+  ) +
+  scale_fill_manual(
+    name = "Reef Zone",
+    values = zone_colors,
+    breaks = names(zone_colors),
+    guide = guide_legend(order = 1)
+  ) +
+  
+  # B. REEF STRUCTURES
+  geom_sf(
+    data = gbr_feat,
+    lwd = 0.01,
+    fill = "seashell2",
+    colour = NA
+  ) +
+  
+  # C. SAMPLING SITES (with outlines)
+  geom_sf(
+    data = map_coords_trip4,
+    aes(color = Open_or_Closed_to_fishing, shape = SECTOR),
+    size = 3.5,
+    stroke = 0.8,  # Outline thickness
+    fill = "white", # For shapes 21-25
+    show.legend = "point"
+  ) +
+  
+  # D. REEF LABELS (with white background)
+  geom_label_repel(
+    data = map_coords_trip4,
+    aes(x = lon, y = lat, label = name, color = Open_or_Closed_to_fishing),
+    fontface = "bold",
+    size = 3.2,
+    label.padding = unit(0.15, "lines"),
+    label.size = 0.4,  # Outline thickness
+    fill = "white",
+    alpha = 0.8,
+    segment.color = "black",
+    segment.alpha = 0.6,
+    segment.size = 0.1,
+    nudge_x = c(-0.2, -0.2, 0.5, 0.2, 0.2, -0.1, 0.1, -0.3, 0.3, 0.2, 0.2, -0.1, -0.1, -0.2),
+    nudge_y = c(-0.2, -0.1, 0.1, 0, 0.1, -0.2, 0.1, -0.3, 0.1, 0, -0.2, -0.1, -0.1, -0.2)
+  ) +
+  
+  # E. MAP DECORATIONS
+  annotation_scale(
+    location = "bl",
+    width_hint = 0.3,
+    pad_x = unit(0.5, "cm"),
+    pad_y = unit(0.8, "cm")
+  ) +
+  annotation_north_arrow(
+    location = "bl",
+    which_north = "true",
+    pad_x = unit(0.5, "cm"),
+    pad_y = unit(0.5, "cm"),
+    height = unit(0.8, "cm"),
+    width = unit(0.8, "cm"),
+    style = north_arrow_fancy_orienteering
+  ) +
+  
+  # F. COORDINATES (Trip 4 extent)
+  coord_sf(xlim = c(146.8, 148), ylim = c(-19, -18.1)) +
+  
+  # G. COLOR/SHAPE SCALES
+  scale_color_manual(
+    name = "Protection Status",
+    values = colors.open.closed,
+    guide = guide_legend(
+      order = 2,
+      override.aes = list(shape = 21, stroke = 0.8, fill = "white")
+    )
+  ) +
+  scale_shape_manual(
+    name = "Sector",
+    values = c(
+      "CG" = 16,
+      "PC" = 17,
+      "SW" = 18,
+      "CA" = 15,
+      "CB" = 19,
+      "TO" = 3,
+      "IN" = 4
+    ),
+    guide = guide_legend(
+      order = 3,
+      override.aes = list(stroke = 0.8, fill = "white", color = "black")
+    )
+  ) +
+  
+  # H. THEME
+  theme_classic() +
+  theme(
+    panel.background = element_rect(fill = "lightblue3", colour = "lightblue3"),
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    plot.subtitle = element_text(hjust = 0.5),
+    legend.direction = "vertical",
+    legend.box = "vertical",
+    legend.spacing.y = unit(0.2, "cm"),
+    legend.key = element_rect(fill = "white")
+  ) +
+  labs(
+    x = "Longitude (°E)",
+    y = "Latitude (°S)",
+    title = "IMOS Microbial Genomics Database - Transect 4",
+    subtitle = "Colored by reef zoning and protection status (July 2020)"
+  )
+
+# View plot
+IMOS_MGD_trip4
+
+# Save
+ggsave(
+  "IMOS_MGD_Trip4_Map.pdf",
+  plot = IMOS_MGD_trip4,
+  device = cairo_pdf,
+  width = 7,
+  height = 5,
+  dpi = 300
+)
+```
+
+# Saving the R object (for downstream analysis)
+
+```{r Save an R object, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+save.image(file = "/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/cleaned_code/Figure_1/Figure_1.RData")
+```
+
+The final map (Fig. 1) was created in Inkscape.
