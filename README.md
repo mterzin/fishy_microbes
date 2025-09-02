@@ -1,9 +1,20 @@
-# Fishy Microbes: Seawater microbial indicators of reef protection on the Great Barrier Reef
+# No-take marine reserves promote oligotrophic reef bacterioplankton communities across the Great Barrier Reef
 
 This repository contains the code for the statistical analysis, machine learning, and integration of microbial and environmental data for the manuscript:
 
 > **Title:** No-take marine reserves promote oligotrophic reef bacterioplankton communities across the Great Barrier Reef
-> **Authors:** Your Names Here
+> **Authors:** Marko Terzin<sup>1,2,3,*</sup>, Steven J. Robbins<sup>4</sup>, Kim-Anh Lê Cao<sup>5</sup>, Sara C. Bell<sup>1</sup>, Katherine E. Dougan<sup>4</sup>, Julian Zaugg<sup>4</sup>, Renee K. Gruber<sup>1</sup>, Michael J. Emslie<sup>1</sup>, Daniela M. Ceccarelli<sup>1</sup>, Samuel Chaffron<sup>6,7</sup>, Philip Hugenholtz<sup>4</sup>, Nicole S. Webster<sup>1,4,8</sup>, David G. Bourne<sup>1,2,3</sup>, Yun Kit Yeoh<sup>1,3</sup>, Patrick W. Laffy<sup>1,3,*</sup>
+>
+> <sup>1</sup>Australian Institute of Marine Science, PMB no3 Townsville MC, Townsville QLD 4810<br>
+> <sup>2</sup>College of Science and Engineering, James Cook University, Townsville, 4811.<br>
+> <sup>3</sup>AIMS@JCU, James Cook University, Townsville QLD 4811<br>
+> <sup>4</sup>Australian Centre for Ecogenomics, School of Chemistry and Molecular Biosciences, The University of Queensland, St Lucia, QLD 4072<br>
+> <sup>5</sup>Melbourne Integrative Genomics and School of Mathematics and Statistics, University of Melbourne, Melbourne, Parkville VIC 3052<br>
+> <sup>6</sup>Nantes Université, École Centrale Nantes, CNRS, LS2N, UMR 6004, F-44000 Nantes, France.<br>
+> <sup>7</sup>Research Federation for the Study of Global Ocean Systems Ecology and Evolution, FR2022/Tara Oceans GOSEE, F-75016 Paris, France.<br>
+> <sup>8</sup>Institute for Marine and Antarctic Studies, University of Tasmania, TAS, 7001<br>
+> <sup>*</sup>Corresponding authors
+>
 > **Status:** Preprint/In Review/Published (link to paper here)
 
 ## Project Overview
@@ -19,9 +30,10 @@ All primary data used in this analysis are publicly available or available upon 
 *   **Processed pMAGs and Abundance Tables:** 
 *   **Physico-chemical Variables:** Available from the IMOS-AODN portal: [Australian Institute of Marine Science (AIMS). (2022). Great Barrier Reef Genomics Database: Seawater Illumina Reads.](https://doi.org/10.25845/Q4XH-YN10)
 *   **Benthic Cover & Fish Data:** Managed by the AIMS Long-Term Monitoring Program (LTMP). Can be accessed via the AIMS data portal (https://apps.aims.gov.au/metadata/view/a17249ab-5316-4396-bb27-29f2d568f727)
-*   **Code for Metagenomic Assembly & Binning:** Described in the companion manuscript: Robbins et al. (2025). "The planktonic microbiome of the Great Barrier Reef".
+*   **Code for Metagenomic Assembly & Binning:** Described in the companion preprint: Robbins et al. (2025). "The planktonic microbiome of the Great Barrier Reef". [https://www.biorxiv.org/content/10.1101/2025.05.13.653689v1](https://www.biorxiv.org/content/10.1101/2025.05.13.653689v1)
 
 ## Repository Structure
+
 fishy_microbes/
 ├── data/
 │ ├── processed/ # Processed CLR-transformed abundance tables, environmental data
