@@ -116,12 +116,27 @@ Metagenomes were assembled using the **Aviary v0.3.3** pipeline, which generated
 - Sampling timeline: 4 transects (Nov 2019 – Jul 2020)
 - Reef protection status and GBR zoning categories
 
-### Figure 2: Microbial Indicators of Reef Protection (`Figure_2.Rmd`)
-- **PERMANOVA/dbRDA**: Community-level tests (vegan v2.6-4)
-- **MINT sPLS-DA**: 350 indicator MAGs, 71% accuracy (mixOmics v6.26.0)
-- **Random Forest validation**: 61.7% accuracy, p = 0.002 (randomForest v4.7-1.1)
-- **ALDEx2 GLM**: Differential abundance with covariates (ALDEx2 v1.32.0)
-- **Presence/absence**: 90.6% of indicators present in all samples
+### Figure 2: Microbial Indicators of Reef Protection (`Figure_2_Nature_Communications.Rmd`)
+
+This script implements a comprehensive analytical framework to identify and validate microbial indicators of reef protection status:
+
+**1. Community-level assessment:**
+- **PCA**: Principal Components Analysis to explore major sources of variation in microbial community composition (`mixOmics` v6.26.0)
+- **PERMANOVA**: Permutational Multivariate Analysis of Variance testing the effect of reef protection status on microbial communities while accounting for sampling trip, geographic sector, and reef identity as spatiotemporal covariates (`vegan` v2.6-4; 9,999 permutations)
+- **dbRDA**: Distance-based Redundancy Analysis for constrained ordination of protection effects
+
+**2. Indicator identification with spatiotemporal integration:**
+- **MINT sPLS-DA**: Multivariate INTegration Sparse Partial Least Squares Discriminant Analysis that identifies microbial indicators discriminating between NTMRs and fished reefs while accounting for sector-specific variation (`mixOmics` v6.26.0). Leave-One-Group-Out Cross-Validation (LOGOCV) with iterative training on six sectors and validation on the remaining sector was used to determine optimal number of MINT sPLS-DA components and features.
+- **Permutation testing**: Zone-label shuffling (999 permutations within sectors) to generate null distribution and calculate p-value and Cohen's d effect size.
+
+**3. Independent validation methods:**
+- **Random Forest classification**: Non-linear supervised learning with leave-one-sector-out cross-validation, permutation testing (999 iterations), feature importance assessment, and methodological concordance analysis (Jaccard similarity, Cohen's Kappa) (`randomForest` v4.7-1.1)
+- **ALDEx2 pairwise comparison**: Welch's t-test and Wilcoxon rank-sum tests on CLR-transformed abundances without covariates
+- **ALDEx2 GLM**: ANOVA-like differential expression with Generalized Linear Models incorporating spatiotemporal covariates (Open_or_Closed_to_fishing + Sampling_trip + SECTOR_N_S) using Dirichlet-multinomial modeling (128 Monte Carlo samples, FDR correction α = 0.05) (`ALDEx2` v1.34.0)
+
+**4. Validation of indicator robustness:**
+- **Presence/absence analysis**: Detection frequency quantification for indicator MAGs across 190 samples using raw count data to assess whether abundance differences reflect genuine ecological variation versus genome size bias
+- **Read-based validation**: Assembly-independent verification using DIAMOND (v2.0.9) mapping against NCBI nr database, MEGAN (v6.23.0) taxonomic profiling, and MINT sPLS-DA on read-based profiles to confirm indicator selection across independent methods
 
 ### Figure 3: Microbial-Environment Correlations (`Figure_3.Rmd`)
 - **MINT sPLS**: Integrating 876 MAGs with 54 environmental variables
