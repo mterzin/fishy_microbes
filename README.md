@@ -1,121 +1,180 @@
 # No-take marine reserves promote oligotrophic reef bacterioplankton communities across the Great Barrier Reef
 
-This repository contains the code for the statistical analysis, machine learning, and integration of microbial and environmental data for the manuscript:
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.17109887.svg)](https://doi.org/10.5281/zenodo.17109887)
+[![R version](https://img.shields.io/badge/R-4.3.2-blue.svg)](https://www.r-project.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-> **Title:** No-take marine reserves promote oligotrophic reef bacterioplankton communities across the Great Barrier Reef
-> **Authors:** Marko Terzin<sup>1,2,3,*</sup>, Steven J. Robbins<sup>4</sup>, Kim-Anh Lê Cao<sup>5</sup>, Sara C. Bell<sup>1</sup>, Katherine E. Dougan<sup>4</sup>, Julian Zaugg<sup>4</sup>, Renee K. Gruber<sup>1</sup>, Michael J. Emslie<sup>1</sup>, Daniela M. Ceccarelli<sup>1</sup>, Samuel Chaffron<sup>6,7</sup>, Philip Hugenholtz<sup>4</sup>, Nicole S. Webster<sup>1,4,8</sup>, David G. Bourne<sup>1,2,3</sup>, Yun Kit Yeoh<sup>1,3</sup>, Patrick W. Laffy<sup>1,3,*</sup>
->
-> <sup>1</sup>Australian Institute of Marine Science, PMB no3 Townsville MC, Townsville QLD 4810<br>
-> <sup>2</sup>College of Science and Engineering, James Cook University, Townsville, 4811.<br>
-> <sup>3</sup>AIMS@JCU, James Cook University, Townsville QLD 4811<br>
-> <sup>4</sup>Australian Centre for Ecogenomics, School of Chemistry and Molecular Biosciences, The University of Queensland, St Lucia, QLD 4072<br>
-> <sup>5</sup>Melbourne Integrative Genomics and School of Mathematics and Statistics, University of Melbourne, Melbourne, Parkville VIC 3052<br>
-> <sup>6</sup>Nantes Université, École Centrale Nantes, CNRS, LS2N, UMR 6004, F-44000 Nantes, France.<br>
-> <sup>7</sup>Research Federation for the Study of Global Ocean Systems Ecology and Evolution, FR2022/Tara Oceans GOSEE, F-75016 Paris, France.<br>
-> <sup>8</sup>Institute for Marine and Antarctic Studies, University of Tasmania, TAS, 7001<br>
-> <sup>*</sup>Corresponding authors
->
-> **Status:** Preprint/In Review/Published (link to paper here)
+**Authors:** Marko Terzin<sup>1,2,3,*</sup>, Steven J. Robbins<sup>4</sup>, Kim-Anh Lê Cao<sup>5</sup>, Sara C. Bell<sup>1</sup>, Katherine E. Dougan<sup>4</sup>, Julian Zaugg<sup>4</sup>, Renee K. Gruber<sup>1</sup>, Michael J. Emslie<sup>1</sup>, Daniela M. Ceccarelli<sup>1</sup>, Samuel Chaffron<sup>6,7</sup>, Philip Hugenholtz<sup>4</sup>, Nicole S. Webster<sup>1,4,8</sup>, David G. Bourne<sup>1,2,3</sup>, Yun Kit Yeoh<sup>1,3</sup>, Patrick W. Laffy<sup>1,3,*</sup>
+
+<sup>1</sup>Australian Institute of Marine Science, PMB no3 Townsville MC, Townsville QLD 4810  
+<sup>2</sup>College of Science and Engineering, James Cook University, Townsville, 4811  
+<sup>3</sup>AIMS@JCU, James Cook University, Townsville QLD 4811  
+<sup>4</sup>Australian Centre for Ecogenomics, School of Chemistry and Molecular Biosciences, The University of Queensland, St Lucia, QLD 4072  
+<sup>5</sup>Melbourne Integrative Genomics and School of Mathematics and Statistics, University of Melbourne, Melbourne, Parkville VIC 3052  
+<sup>6</sup>Nantes Université, École Centrale Nantes, CNRS, LS2N, UMR 6004, F-44000 Nantes, France  
+<sup>7</sup>Research Federation for the Study of Global Ocean Systems Ecology and Evolution, FR2022/Tara Oceans GOSEE, F-75016 Paris, France  
+<sup>8</sup>Institute for Marine and Antarctic Studies, University of Tasmania, TAS, 7001  
+<sup>*</sup>Corresponding authors
+
+**Status:** Under revision at *Nature Communications*
+
+---
 
 ## Project Overview
 
-This study investigates the relationship between seawater microbiomes, environmental variables, and reef protection status (No-Take Marine Reserves vs. fished reefs) across the Great Barrier Reef (GBR). We integrated prokaryotic metagenome-assembled genomes (pMAGs), physico-chemical water data, benthic cover, and fish survey data to identify microbial indicators of reef zoning and predict environmental conditions from microbial community composition.
+This study investigates the relationship between seawater microbiomes, environmental variables, and reef protection status (No-Take Marine Reserves vs. fished reefs) across the Great Barrier Reef (GBR). We integrated 876 prokaryotic metagenome-assembled genomes (pMAGs), physico-chemical water data, benthic cover, and fish survey data to identify microbial indicators of reef zoning and predict environmental conditions from microbial community composition.
+
+**Key finding:** NTMRs harbor distinct seawater microbiomes characterized by oligotrophic taxa (*Pelagibacterales*, SAR86, *Marinismatales*), while fished reefs are enriched in copiotrophic taxa (*Flavobacteriales*, UA16). These microbial signatures predict zoning with ~71% accuracy across 7 GBR sectors.
+
+---
 
 ## Data Availability
 
-All primary data used in this analysis are publicly available or available upon request:
+| Data type | Repository | Accession/Link |
+|-----------|------------|----------------|
+| Metagenomic Sequences | EBI BioProject | [PRJEB82623](https://www.ebi.ac.uk/ena/browser/view/PRJEB82623) |
+| pMAGs (5,283 high-quality) | Zenodo | [10.5281/zenodo.17109887](https://doi.org/10.5281/zenodo.17109887) |
+| Processed abundance tables | Zenodo | [10.5281/zenodo.17109887](https://doi.org/10.5281/zenodo.17109887) |
+| Physico-chemical variables | IMOS-AODN | [10.25845/Q4XH-YN10](https://doi.org/10.25845/Q4XH-YN10) |
+| Benthic cover & fish data | AIMS LTMP | [AIMS Data Portal](https://apps.aims.gov.au/metadata/view/a17249ab-5316-4396-bb27-29f2d568f727) |
+| Assembly & binning code | *bioRxiv* | [Robbins et al. 2025](https://www.biorxiv.org/content/10.1101/2025.05.13.653689v1) |
 
-*   **Metagenomic Sequences**: Available under EBI BioProject **[PRJEB82623](https://www.ebi.ac.uk/ena/browser/view/PRJEB82623)**.
-*   **pMAGs:** Deposited on Zenodo: **[DOI: XXXXXXXX](https://doi.org/XXXXXXX)** (To be activated upon acceptance).
-*   **Processed pMAGs and Abundance Tables:** 
-*   **Physico-chemical Variables:** Available from the IMOS-AODN portal: [Australian Institute of Marine Science (AIMS). (2022). Great Barrier Reef Genomics Database: Seawater Illumina Reads.](https://doi.org/10.25845/Q4XH-YN10)
-*   **Benthic Cover & Fish Data:** Managed by the AIMS Long-Term Monitoring Program (LTMP). Can be accessed via the AIMS data portal (https://apps.aims.gov.au/metadata/view/a17249ab-5316-4396-bb27-29f2d568f727)
-*   **Code for Metagenomic Assembly & Binning:** Described in the companion preprint: Robbins et al. (2025). "The planktonic microbiome of the Great Barrier Reef". [https://www.biorxiv.org/content/10.1101/2025.05.13.653689v1](https://www.biorxiv.org/content/10.1101/2025.05.13.653689v1)
+---
 
 ## Repository Structure
-
 fishy_microbes/
+│
+├── README.md # This file
+├── LICENSE # MIT License
+├── .gitignore # Ignored files
+├── sessionInfo.txt # Complete R session information
+│
 ├── data/
-│ ├── processed/ # Processed CLR-transformed abundance tables, environmental data
-│ └── raw/ # Links to raw data (see above)
+│ ├── processed/ # Processed CLR-transformed abundance tables
+│ └── raw/ # Links to raw data (see Data Availability)
+│
 ├── figs/ # Generated output figures
+│
 ├── scripts/
-│ ├── 01_indicator_analysis.R # MINT sPLS-DA for microbial indicators
-│ ├── 02_environment_integration.R # MINT sPLS for microbe-environment correlations
-│ ├── 03_glmm_analysis.R # GLMMs for environmental variables
-│ ├── 04_network_analysis.R # Network connectedness and cohesion
-│ ├── 05_random_forest.R # Random Forest predictions
-│ └── 06_niche_analysis.R # Microbial niche inference (Chaffron et al. 2021 method)
-└── README.md
+│ ├── Figure_1.Rmd # Map of sampling sites across the GBR
+│ ├── Figure_2.Rmd # MINT sPLS-DA, RF validation, ALDEx2
+│ ├── Figure_3.Rmd # MINT sPLS: microbial-environment correlations
+│ ├── Figure_4.Rmd # Network analysis and microbial interactions
+│ ├── Figure_5.Rmd # GLMMs and environmental predictions
+│ └── Figure_6.Rmd # Microbial niche analysis
+│
+├── validation/ # Validation analyses (Figure 2)
+│ ├── 01_mint_validation.Rmd # MINT sPLS-DA cross-validation
+│ ├── 02_random_forest_zoning.Rmd # RF classification with LOOCV
+│ ├── 03_aldex2_glm.Rmd # ALDEx2 GLM with covariates
+│ ├── 04_direction_agreement.Rmd # Method concordance analysis
+│ └── 05_presence_absence.Rmd # Indicator MAG ubiquity
+│
+├── functions/ # Reusable helper functions
+│ ├── mint_helpers.R
+│ ├── random_forest_helpers.R
+│ ├── aldex2_helpers.R
+│ └── plotting_helpers.R
+│
+└── output/
+├── figures/ # Publication-ready figures
+├── tables/ # Summary tables (CSV)
+└── stats/ # Statistical outputs (.rds)
 
+
+---
+
+## Metagenomic Processing
+
+Metagenomes were assembled using the **Aviary v0.3.3** pipeline, which generated:
+- **Hybrid assemblies** (Illumina + Nanopore) for 27 sites
+- **Short-read-only assemblies** for 21 sites
+
+### Assembly & Binning
+- **Long-read processing**: Guppy v5.0.16 (superaccuracy basecalling), Porechop (adapter/barcode trimming)
+- **Assembly**: Aviary v0.3.3 with metaFlye and metaSPAdes
+- **Binning**: MetaBAT2, MaxBin2, CONCOCT, and VAMB
+- **Refinement**: DAS Tool v1.1.2
+- **Quality assessment**: CheckM v1.2.2 and CheckM2 v1.0.2
+
+### Dereplication & Abundance
+- **Dereplication**: CoverM v0.6 at 95% Average Nucleotide Identity (ANI)
+- **Result**: 5,283 pMAGs → 876 "species-resolved" pMAGs<sub>95%ANI</sub>
+- **Read mapping**: minimap2 v2.18 (via CoverM) for abundance estimation
+
+### Taxonomic & Functional Annotation
+- **Taxonomy**: Genome Taxonomy Database Toolkit (GTDB-Tk, release R214)
+- **Functional annotation**: anvi'o v8 with KEGG Orthology (KO) database
+- **Metabolic pathways**: KEGG module completeness (358 modules detected)
+
+---
 
 ## Analysis Workflow
 
-The code in this repository replicates the following key analyses:
+### Figure 1: Study Site Map (`Figure_1.Rmd`)
+- Map of 48 offshore reefs across 7 GBR sectors
+- Sampling timeline: 4 transects (Nov 2019 – Jul 2020)
+- Reef protection status and GBR zoning categories
 
-### 1. Microbial Indicator Analysis (`01_indicator_analysis.R`)
-- **Multivariate INTegration Sparse PLS-Discriminant Analysis (MINT sPLS-DA)** to identify prokaryotic metagenome-assembled genomes (pMAGs) that consistently discriminate between NTMRs and fished reefs across different GBR sectors, accounting for spatiotemporal confounding effects.
+### Figure 2: Microbial Indicators of Reef Protection (`Figure_2.Rmd`)
+- **PERMANOVA/dbRDA**: Community-level tests (vegan v2.6-4)
+- **MINT sPLS-DA**: 350 indicator MAGs, 71% accuracy (mixOmics v6.26.0)
+- **Random Forest validation**: 61.7% accuracy, p = 0.002 (randomForest v4.7-1.1)
+- **ALDEx2 GLM**: Differential abundance with covariates (ALDEx2 v1.32.0)
+- **Presence/absence**: 90.6% of indicators present in all samples
 
-### 2. Correlation with Environmental Variables (`02_environment_integration.R`)
-- **MINT Sparse PLS (MINT sPLS)** to integrate the identified microbial indicator abundances with 54 continuous environmental variables (physico-chemical, benthic cover, fish data) and identify key associations.
+### Figure 3: Microbial-Environment Correlations (`Figure_3.Rmd`)
+- **MINT sPLS**: Integrating 876 MAGs with 54 environmental variables
+- Key drivers: POM, NOₓ, herbivorous fish biomass, hard coral cover
+- Biplots and clustered image maps (CIM)
 
-### 3. Testing Environmental Differences (`03_glmm_analysis.R`)
-- **Generalised Linear Mixed Models (GLMMs)** using `glmmTMB` to test if key environmental variables (e.g., herbivore density, hard coral cover) significantly differ between protection zones, with nested random effects (sector, reef, site, transect).
+### Figure 4: Microbial Network Analysis (`Figure_4.Rmd`)
+- **Co-occurrence networks**: Connectedness and cohesion metrics (Herren & McMahon 2017)
+- **Network comparison**: NTMR vs. fished reef networks
+- **Regression**: Genome size, GC content, and KEGG module completeness vs. network properties
 
-### 4. Microbial Network Analysis (`04_network_analysis.R`)
-- Calculation of **network connectedness** (microbe-specific) and **cohesion** (sample-specific) metrics to compare the structure of positive and negative microbial associations between NTMRs and fished reefs.
+### Figure 5: Environmental Predictions (`Figure_5.Rmd`)
+- **GLMMs**: Testing environmental differences (glmmTMB v1.1.10, DHARMa v0.4.7)
+- **Random Forest regression**: Predicting continuous variables from microbial data
+- High accuracy predictions: temperature (R² = 0.74), salinity (R² = 0.69), particulate nutrients (R² = 0.66-0.74)
 
-### 5. Environmental Predictions (`05_random_forest.R`)
-- **Random Forest (RF) regression models** to predict continuous environmental variables from microbial abundance data (CLR-transformed). Models were validated using stratified, site-aware repeated train-test splits.
+### Figure 6: Microbial Niche Analysis (`Figure_6.Rmd`)
+- **Niche inference**: Robust optimum (RO) method (Chaffron et al. 2021)
+- Niche bounds: Q1 (lower bound), Q2 (optimum), Q3 (upper bound)
+- Specialist vs. generalist taxa identification
 
-### 6. Microbial Niche Inference (`06_niche_analysis.R`)
-- Inference of **microbial niche tolerance ranges** (lower bound Q1, optimum Q2, upper bound Q3) for each pMAG against each environmental variable was done using the robust optimum (RO) method, following the protocol from [Chaffron et al. (2021)](https://doi.org/10.1126/sciadv.abg1921).
+---
+
+## Key R Packages and Versions
+
+| Package | Version | Citation | Purpose |
+|---------|---------|----------|---------|
+| mixOmics | 6.26.0 | Rohart et al. 2017 | MINT sPLS-DA, MINT sPLS |
+| vegan | 2.6-4 | Oksanen et al. 2022 | PERMANOVA, dbRDA |
+| randomForest | 4.7-1.1 | Liaw & Wiener 2002 | Random Forest classification/regression |
+| ALDEx2 | 1.32.0 | Fernandes et al. 2013 | Differential abundance testing |
+| glmmTMB | 1.1.10 | Brooks et al. 2017 | GLMMs for environmental variables |
+| DHARMa | 0.4.7 | Hartig 2022 | GLMM residual diagnostics |
+| phyloseq | 1.46.0 | McMurdie & Holmes 2013 | Microbiome data handling |
+| microbiome | 1.24.0 | Lahti & Shetty 2017 | CLR transformation |
+| tidyverse | 2.0.0 | Wickham et al. 2019 | Data wrangling & visualization |
+| ggplot2 | 3.5.1 | Wickham 2016 | Publication-quality graphics |
+| patchwork | 1.2.0 | Pedersen 2024 | Plot composition |
+| igraph | 1.5.1 | Csárdi & Nepusz 2006 | Network analysis |
+| dataaimsr | 1.0.0 | Australian Institute of Marine Science | AIMS data access |
+| gisaimsr | 1.0.0 | Australian Institute of Marine Science | Spatial data access |
+| anvi'o | 8 | Eren et al. 2015 | Functional annotation (external) |
+| CoverM | 0.6 | Aroney et al. 2025 | MAG dereplication (external) |
+
+Full session details available in `sessionInfo.txt`.
+
+---
 
 ## Usage
 
-To replicate the analysis:
+### 1. Clone the repository
 
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/mterzin/fishy_microbes.git
-    cd fishy_microbes
-    ```
+```bash
+git clone https://github.com/mterzin/fishy_microbes.git
+cd fishy_microbes
 
-2.  **Install Required R Packages:**
-    Ensure the following R packages are installed:
-    - `tidyverse`
-    - `mixOmics`
-    - `glmmTMB`
-    - `DHARMa`
-    - `randomForest`
-    - `microbiome`
-
-    A full list of dependencies and versions is available in `sessionInfo.txt`.
-
-3.  **Obtain Data:**
-    Download the processed data from Zenodo ([DOI: XXXXXXXX](https://doi.org/XXXXXXX)) and place it in the `data/processed/` directory. *Note: Raw data must be sourced from the links provided in the Data Availability section above.*
-
-4.  **Run Scripts:**
-    Execute the R scripts in the `scripts/` directory in numerical order.
-
-## Dependencies
-
-The code was run under R version 4.3.2. See `sessionInfo.txt` for a complete list of package versions.
-
-## Citation
-
-If you use this code or the associated data, please cite our publication:
-
-> *Citation to be added upon publication.*
-
-## Acknowledgements
-
-- Seawater sampling and initial metagenomic processing were conducted by the Australian Institute of Marine Science (AIMS) Long-Term Monitoring Program (LTMP).
-- The microbial niche analysis was performed following the protocol from Chaffron et al. (2021); the specific code for this analysis is available from the authors of that study upon request.
-- This work was supported by...
-
-## Contact
-
-For questions regarding this code and analysis, please open an issue on GitHub or contact:
-- Your Name: [your.email@domain.com]
-- Marko Terzin: [marko.terzin@domain.com]
