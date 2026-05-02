@@ -39,51 +39,6 @@ This study investigates the relationship between seawater microbiomes, environme
 | Benthic cover & fish data | AIMS LTMP | [AIMS Data Portal](https://apps.aims.gov.au/metadata/view/a17249ab-5316-4396-bb27-29f2d568f727) |
 | Assembly & binning code | *bioRxiv* | [Robbins et al. 2025](https://www.biorxiv.org/content/10.1101/2025.05.13.653689v1) |
 
----
-
-## Repository Structure
-fishy_microbes/
-│
-├── README.md # This file
-├── LICENSE # MIT License
-├── .gitignore # Ignored files
-├── sessionInfo.txt # Complete R session information
-│
-├── data/
-│ ├── processed/ # Processed CLR-transformed abundance tables
-│ └── raw/ # Links to raw data (see Data Availability)
-│
-├── figs/ # Generated output figures
-│
-├── scripts/
-│ ├── Figure_1.Rmd # Map of sampling sites across the GBR
-│ ├── Figure_2.Rmd # MINT sPLS-DA, RF validation, ALDEx2
-│ ├── Figure_3.Rmd # MINT sPLS: microbial-environment correlations
-│ ├── Figure_4.Rmd # Network analysis and microbial interactions
-│ ├── Figure_5.Rmd # GLMMs and environmental predictions
-│ └── Figure_6.Rmd # Microbial niche analysis
-│
-├── validation/ # Validation analyses (Figure 2)
-│ ├── 01_mint_validation.Rmd # MINT sPLS-DA cross-validation
-│ ├── 02_random_forest_zoning.Rmd # RF classification with LOOCV
-│ ├── 03_aldex2_glm.Rmd # ALDEx2 GLM with covariates
-│ ├── 04_direction_agreement.Rmd # Method concordance analysis
-│ └── 05_presence_absence.Rmd # Indicator MAG ubiquity
-│
-├── functions/ # Reusable helper functions
-│ ├── mint_helpers.R
-│ ├── random_forest_helpers.R
-│ ├── aldex2_helpers.R
-│ └── plotting_helpers.R
-│
-└── output/
-├── figures/ # Publication-ready figures
-├── tables/ # Summary tables (CSV)
-└── stats/ # Statistical outputs (.rds)
-
-
----
-
 ## Metagenomic Processing
 
 Metagenomes were assembled using the **Aviary v0.3.3** pipeline, which generated:
@@ -113,7 +68,7 @@ Metagenomes were assembled using the **Aviary v0.3.3** pipeline, which generated
 
 ### Figure 1: Study Site Map (`Figure_1.Rmd`)
 - Map of 48 offshore reefs across 7 GBR sectors
-- Sampling timeline: 4 transects (Nov 2019 – Jul 2020)
+- Sampling timeline: 4 transects (Nov 2019 – Jul 2020) and 7 sectors
 - Reef protection status and GBR zoning categories
 
 ### Figure 2: Microbial Indicators of Reef Protection (`Figure_2_Nature_Communications.Rmd`)
@@ -140,13 +95,32 @@ This script implements a comprehensive analytical framework to identify and vali
 
 ### Figure 3: Microbial-Environment Correlations (`Figure_3.Rmd`)
 - **MINT sPLS**: Integrating 876 MAGs with 54 environmental variables
-- Key drivers: POM, NOₓ, herbivorous fish biomass, hard coral cover
 - Biplots and clustered image maps (CIM)
 
 ### Figure 4: Microbial Network Analysis (`Figure_4.Rmd`)
 - **Co-occurrence networks**: Connectedness and cohesion metrics (Herren & McMahon 2017)
-- **Network comparison**: NTMR vs. fished reef networks
+- **Network comparison**: NTMR vs. fished reef networks (connectedness and cohesion)
 - **Regression**: Genome size, GC content, and KEGG module completeness vs. network properties
+
+A custom-made Python script implements co-occurrence network analysis to compare microbial community structure (**MODULARITY**) between NTMR and fished reefs:
+
+**1. Network construction (FlashWeave):**
+- **Co-occurrence networks**: Constructed for each sector × zone combination (n = 14 networks) using FlashWeave<sup>86</sup> (v0.19.2) via the `flashweave` Julia package
+- **Data transformation**: Raw count tables were CLR-transformed with pseudocounts added (1e-6)
+- **Network parameters**: Sensitive mode (α = 0.01, max_k = 2) with a minimum of 4 samples per network
+- **Edge filtering**: Only positive partial correlations (weight > 0) were retained, consistent with the predominance of positive associations in global plankton interactomes (98.5% positive edges; Chaffron et al., 2021)<sup>83</sup>
+
+**2. Modularity analysis:**
+- **Binary network conversion**: Positive correlation networks were converted to binary (unweighted) graphs by retaining edges with weight > 0
+- **Modularity calculation**: Computed using the Clauset-Newman-Moore greedy algorithm<sup>87</sup> as implemented in the `cluster_fast_greedy` function from `igraph` v1.5.1<sup>88</sup>
+- **Community detection**: Modularity measures the degree of network compartmentalization, where higher values indicate more compartmentalised community structure
+
+**3. Statistical comparison:**
+- **Between-zone comparison**: Mann-Whitney U tests comparing modularity values between NTMR (n = 7) and fished (n = 7) sector-specific networks
+- **Effect size**: Cohen's d calculated to quantify magnitude of differences
+
+**4. Visualization:**
+- Boxplots comparing modularity distributions between protection statuses with sector-specific shapes and trip colors
 
 ### Figure 5: Environmental Predictions (`Figure_5.Rmd`)
 - **GLMMs**: Testing environmental differences (glmmTMB v1.1.10, DHARMa v0.4.7)
@@ -172,16 +146,40 @@ This script implements a comprehensive analytical framework to identify and vali
 | DHARMa | 0.4.7 | Hartig 2022 | GLMM residual diagnostics |
 | phyloseq | 1.46.0 | McMurdie & Holmes 2013 | Microbiome data handling |
 | microbiome | 1.24.0 | Lahti & Shetty 2017 | CLR transformation |
+| igraph | 1.5.1 | Csárdi & Nepusz 2006 | Network analysis, modularity |
 | tidyverse | 2.0.0 | Wickham et al. 2019 | Data wrangling & visualization |
 | ggplot2 | 3.5.1 | Wickham 2016 | Publication-quality graphics |
 | patchwork | 1.2.0 | Pedersen 2024 | Plot composition |
-| igraph | 1.5.1 | Csárdi & Nepusz 2006 | Network analysis |
-| dataaimsr | 1.0.0 | Australian Institute of Marine Science | AIMS data access |
+| dataaimsr | 1.0.0 | Australian Institute of Marine Science | Spatial data access |
 | gisaimsr | 1.0.0 | Australian Institute of Marine Science | Spatial data access |
-| anvi'o | 8 | Eren et al. 2015 | Functional annotation (external) |
-| CoverM | 0.6 | Aroney et al. 2025 | MAG dereplication (external) |
+
+## External Software & Tools
+
+| Software | Version | Citation | Purpose |
+|----------|---------|----------|---------|
+| FlashWeave | 0.19.2 | Tackmann et al. 2019 | Co-occurrence network inference |
+| Python | 3.12 | Python Core Team | Modularity analysis scripting |
+| networkx | 3.6.1 | Hagberg et al. 2008 | Python network analysis (alternative) |
+| scipy | 1.12.0 | Virtanen et al. 2020 | Statistical tests in Python |
+| anvi'o | 8 | Eren et al. 2015 | Functional annotation |
+| CoverM | 0.6 | Aroney et al. 2025 | MAG dereplication |
+| Aviary | 0.3.3 | Robbins et al. 2025 | Metagenomic assembly & binning |
+| DIAMOND | 2.0.9 | Buchfink et al. 2015 | Read-based validation |
+| MEGAN | 6.23.0 | Huson et al. 2016 | Taxonomic profiling |
 
 Full session details available in `sessionInfo.txt`.
+
+## Python Environment for Modularity Analysis
+
+The modularity analysis requires a Python environment with the following dependencies:
+
+```bash
+# Create conda environment (optional)
+conda create -n modularity_env python=3.12
+conda activate modularity_env
+
+# Install required packages
+pip install networkx pandas numpy scipy matplotlib
 
 ---
 
