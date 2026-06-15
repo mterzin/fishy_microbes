@@ -180,9 +180,7 @@ load("/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/cleaned_co
 setwd("/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs")
 ```
 
-# But Are Fish Abundances/Trophic Group Driving These ***Differences Between Take And No Take Zones?***
-
-# ***MINT sPLS*** | correlating IMOS GBR-MGD microbial data with 53 env. metrics - WQ and benthic cover variables
+# MINT sPLS: integrating microbial abundances with environmental data (water chemistry, benthic cover, and fish)
 
 ```{r MINT sPLS with Fish data sector, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
 ### Making sure Y looks good:
@@ -916,7 +914,7 @@ ggplot(MINT_sPLS_loading.plots.long.sectors.env,                                
       theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 12))
 ```
 
-## MINT sPLS | correlating 876 IMOS-MGD MAGs (95% ANI) with ***continuous WQ metrics*** only
+# MINT sPLS: integrating microbial abundances with environmental data (water chemistry ***only***)
 
 We attempted MINT (Multivariate INTegration, Rohart et al. (2017b)), a method based on multi-group PLS that includes information about samples belonging to independent groups or studies (Eslami et al., 2014). In this context, the challenge was to accommodate for confounding effects between season and geography as each site was sampled only once in time and space. By using MINT sPLS, we aimed to identify microbial Indicator MAGs that correlate to water chemistry metrics and are shared across the 7 GBR sectors we sampled, regardless of geography or season. In MINT sPLS we retained two dimensions and 50 MAGs per dimension for the X datasets, and all WQ metrics for the Y dataset.
 
