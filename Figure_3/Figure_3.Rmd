@@ -1,0 +1,1433 @@
+---
+title: "Figure 3"
+subtitle: "R code to replicate the analysis"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+documentclass: article
+mainfont: Lato
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: 3
+    number_sections: yes
+    df_print: kable
+    fig_caption: true
+    highlight: zenburn
+    latex_engine: xelatex 
+  html_document:
+    code_folding: show
+    collapse: no
+    df_print: paged
+    fig_caption: yes
+    fig_height: 4
+    fig_width: 4
+    highlight: textmate
+    theme: united
+    toc: yes
+    toc_float: yes
+    css: "/home/marko-terzin/Documents/PhD/Thesis/Chapter_2/Data_analysis/Seawater/testing_Igor_Antti_R_script/All_seawater_full_dataset/resources/ws_style.css"  
+  word_document:
+#    fig_caption: yes
+#    fig_height: 4
+#    fig_width: 4
+#    highlight: tango
+    toc: yes
+#    toc_depth: 2  
+# bibliography: ../resources/references.bib
+fontsize: 11pt
+geometry: margin=1in
+classoption: a4paper
+abstract: This is the code for MINT sPLS (and all the supporting analys2s) to make Fig. 3 (and the relevant supplementary figures/tables). 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r Loading libraries, results = "hide", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# First checking if I have the packages I need, and installing if not
+list.of.packages <- c("tidyverse", "gplots", "RColorBrewer", "networkD3", "vegan", "rstatix", 
+                      "ggalluvial", "gridExtra", "propr", "patchwork", "phyloseq", "dplyr", 
+                      "VennDiagram", "plyr", "data.table", "vsn", "pheatmap", "ggpubr", 
+                      "microbiome", "rmarkdown", "mixOmics", "NetCoMi", "igraph", "randomForest", 
+                      "caret", "pdp", "rstatix")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+
+# Installing some separately:
+# phyloseq
+# if (!requireNamespace("BiocManager", quietly = TRUE))
+# install.packages("BiocManager")
+
+# BiocManager::install("phyloseq")
+
+# DESeq2
+# BiocManager::install("DESeq2")
+
+# vsn
+# BiocManager::install("vsn")
+
+# Had issues installing tidyverse, so I followed this first (insttalled some dependencies from the terminal) and then it worked: https://community.rstudio.com/t/tidyverse-package-does-not-install/162507/6
+library(tidyverse)
+library(gplots)
+library(RColorBrewer)
+library(ggrepel)
+library(units)
+library(future) # Needed to use multiple processors
+library(furrr) # Needed to use multiple processors
+library(progressr) # to track the progress
+library(networkD3) # for Sankey diagrams
+library(vegan)
+library(rstatix)
+library(parallel) # for setting multiple CPUs
+library(ggalluvial) # to create alluvial diagrams
+library(gridExtra)
+# library(propr) # to compute the proportionality metric!
+library(patchwork)
+library(phyloseq)
+library(ggnewscale)
+library(dplyr)
+library(VennDiagram)
+# if (!require(devtools)) install.packages("devtools")
+# devtools::install_github("gaospecial/ggVennDiagram")
+library(ggVennDiagram)
+library(ggvenn)
+library(plyr) # Needed for the ordination plots I did on my own
+library(data.table) # For data wrangling
+library(vsn) # For normalization
+# library(psych) # Used to investigate correlations among predictors in RDA analysis, ran in vegan
+library(RColorBrewer)
+library(pheatmap)
+library(ggpubr) # has ggarrange
+# EcolUtils by Guillem Salazar
+library(devtools)
+# devtools::install_github("GuillemSalazar/EcolUtils")
+library(EcolUtils)
+# Install pairwiseAdonis
+# devtools::install_github("pmartinezarbizu/pairwiseAdonis/pairwiseAdonis")
+library(pairwiseAdonis)
+# install.packages("remotes")
+# remotes::install_github("microbiome/microbiome")
+library(microbiome)
+# install.packages("rmarkdown")
+library(rmarkdown)
+library(mixOmics)
+# Installing the most important package - mixOmics!
+# Install mixOmics
+# BiocManager::install('mixOmics')
+# library(pairwiseAdonis)
+
+# Installing the NetCoMi package I will need for microbial networks: https://github.com/stefpeschel/NetCoMi
+# install.packages("devtools")
+# install.packages("BiocManager")
+library(doParallel)
+library(foreach)
+# Install NetCoMi
+# devtools::install_github("stefpeschel/NetCoMi", 
+#                         dependencies = c("Depends", "Imports", "LinkingTo"),
+#                         repos = c("https://cloud.r-project.org/",
+#                                   BiocManager::repositories()))
+library(NetCoMi)
+library(igraph) # needed for the function below: read_graph
+# Now installing propr - to compute proportionality metric (microbial networks)
+# devtools::install_github("tpq/propr")
+# library(propr)
+
+# For random forest models:
+library(randomForest)
+library(caret)  # For data splitting and model evaluation
+library(pdp)
+
+# Packages I need for the map:
+library(reshape2) # This is only needed for the melt funtion
+library(reshape)
+library(dplyr)
+library(plyr)
+library(data.table)
+library(ggplot2)
+library(rworldmap)
+library(rworldxtra)
+# library(ggsn)
+library(sf)
+library(raster)
+library(terra)
+# library(rgeos)
+# library(maps)
+# library(maptools)
+library(grid)
+library(miscTools)
+library(stringr)
+library(ggpubr)
+library(plyr)
+library(gridExtra) # for arranging plots
+
+# Loading all the libraries
+library(raster)
+library(phyloseq)
+library(tidyverse)
+library(ggspatial)
+library(ggrepel) # The package ggrepel offers a very flexible approach to deal with label placement (with geom_text_repel and 
+# geom_label_repel), including automated movement of labels in case of overlap
+# Installing AIMS packages individually
+library(remotes) # Needed to install the AIMS R packages below
+# remotes::install_github("https://github.com/open-AIMS/dataaimsr")
+library(dataaimsr)
+# remotes::install_github("https://github.com/open-AIMS/gisaimsr")
+library(gisaimsr)
+library(sp)
+
+# Importing the R object
+load("/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/cleaned_code/Figure_2/Figure_2.RData")
+
+# Setting the work directory
+setwd("/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs")
+```
+
+# But Are Fish Abundances/Trophic Group Driving These ***Differences Between Take And No Take Zones?***
+
+# ***MINT sPLS*** | correlating IMOS GBR-MGD microbial data with 53 env. metrics - WQ and benthic cover variables
+
+```{r MINT sPLS with Fish data sector, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+### Making sure Y looks good:
+continuous_env_MINT_sPLS <- data.frame(sample_data(pMAGs_95ANI_phyloseq_CLR_per_sector)) %>% 
+  dplyr::select("median_Chlorophyll_A_µg_L", "median_Phaeophytin_A_µg_L", "median_PN_µM", "median_POC_µM", "median_PP_µM", "median_DOC_µM", "median_PO4_µM", "median_NH4_µM", "median_NO2_µM", "median_NO3_µM", "median_Si_µM", "median_TDN_µM", "median_TDP_µM", "median_TSS_mg_L", # "SEAWATER_TEMPERATURE_2.5m_RV", "SALINITY_2.5m_RV", 
+                "FLUORESCENCE_2.5m_RV", "mean_Abiotic", "mean_Arb_and_Enc_Soft_Coral", "mean_Arborescent_Soft_Coral", "mean_Bottlebrush_Acropora", "mean_Branching_Acropora", "mean_Branching_non_Acropora", "mean_Capitate_Soft_Coral", "mean_Coralline_algae", # "mean_Dead_coral_recent", 
+                "mean_Digitate_Acropora", "mean_Encrusting_Acropora", "mean_Encrusting_non_Acropora", "mean_Encrusting_Soft_Coral", "mean_Foliose_non_Acropora", "mean_Lobate_Soft_Coral", # "mean_Macroalgae",
+                "mean_Massive_non_Acropora", "mean_Massive_Soft_Coral", "mean_Millepora", "mean_Mushroom_coral", "mean_Other_organisms", "mean_Rubble", "mean_Sand", "mean_Soft_Coral", "mean_Solitary_coral", "mean_Sponge", "mean_Submassive_Acropora", "mean_Submassive_non_Acropora", "mean_Tabulate_Acropora", "mean_Turf_algae", "mean_Unknown", "mean_Zoanthid", "mean_Fish_Biomass", "mean_Carnivore", "mean_Corallivore", "mean_Detritivore", "mean_Herbivore", "mean_Invertivore", "mean_Piscivore")
+
+# Making sure X looks goos:
+OTUs_biplot_MINT <- MAGs_MINT
+# getting names for taxa
+OTUs_biplot_colnames_MINT <- left_join(otu_table(pMAGs_95ANI_phyloseq_CLR_per_sector) %>%
+                                    as.data.frame %>%
+                                    rownames_to_column("OTU"),
+                                  tax_table(pMAGs_95ANI_phyloseq_CLR_per_sector) %>%
+                                    as.data.frame %>%
+                                    rownames_to_column("OTU")) %>%
+  tidyr::unite(taxonomy, c(Order, Family, Genus, Species), sep = "; ") # Adding Taxonomy info
+## Joining, by = "OTU"
+OTUs_biplot_colnames_MINT <- OTUs_biplot_colnames_MINT %>% 
+  dplyr::select("OTU", "taxonomy")
+# Merging with the OTUs_biplot object
+OTUs_biplot_names_MINT <- left_join(t(OTUs_biplot_MINT) %>% 
+                           as.data.frame() %>% 
+                           rownames_to_column("OTU"),
+                         OTUs_biplot_colnames_MINT) %>% 
+  tidyr::unite(Annotations, c(OTU, taxonomy), sep = "_") %>% 
+  column_to_rownames("Annotations") %>%  # moving this as rowposing back into the right format
+  t() # trans
+
+
+
+# MINT sPLS with all metrics! So because there are so many, let's keep 16 and 6 metrics for the Y dataset
+# keepX_MINT <- c(800, 800)
+keepY <- c(20, 15)
+# With sectors as the block effect
+mint.spls2.fish.MAGs.sector <- mint.spls(X = OTUs_biplot_names_MINT,
+                                  Y = continuous_env_MINT_sPLS,
+#                           Y = metadata_for_MINT_sPLS_with_fish[,c(6:19,23,35:60)], # Only keeping numerical metrics, and without Turbidity
+                           ncomp = 2,
+                           study = sample_data(pMAGs_95ANI_phyloseq_CLR_per_sector)$SECTOR_N_S,
+#                           study = sample_data(pMAGs_95ANI_phyloseq_clr)$Sampling_trip,
+#                           keepX = keepX_MINT, # 70 taxa on dims 1 and 2
+                           keepY = keepY,
+                           mode = "regression")
+```
+
+```{r MINT sPLS fish sample plot global sectors, fig.height=6, fig.width=12, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+mint.spls2.fish.MAGs.global.sample.plot.sectors <- plotIndiv(mint.spls2.fish.MAGs.sector,
+          group = sample_data(pMAGs_95ANI_phyloseq_CLR_per_sector)$Open_or_Closed_to_fishing,
+#          title = 'global MINT sPLS: WQ & LTMP metrics | MAGs (95% ANI)-WQ',
+          legend = T,
+          ellipse = T,
+          rep.space = "XY-variate",
+#          ind.names = sample_names(pMAGs_95ANI_phyloseq_clr),
+          col.per.group = c("seagreen3", # Closed to fishing
+                            "steelblue4"), # Open to fishing
+          legend.title = 'Reef Management Status')
+```
+
+Let's try to make a biplot instead
+
+```{r MINT sPLS fish biplot global sectors, fig.height=8, fig.width=12, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# Making sure Y is clean:
+continuous_env_MINT_sPLS <- data.frame(sample_data(pMAGs_95ANI_phyloseq_CLR_per_sector)) %>% 
+  dplyr::select("median_Chlorophyll_A_µg_L", "median_Phaeophytin_A_µg_L", "median_PN_µM", "median_POC_µM", "median_PP_µM", "median_DOC_µM", "median_PO4_µM", "median_NH4_µM", "median_NO2_µM", "median_NO3_µM", "median_Si_µM", "median_TDN_µM", "median_TDP_µM", "median_TSS_mg_L", # "SEAWATER_TEMPERATURE_2.5m_RV", "SALINITY_2.5m_RV", 
+                "FLUORESCENCE_2.5m_RV", "mean_Abiotic", "mean_Arb_and_Enc_Soft_Coral", "mean_Arborescent_Soft_Coral", "mean_Bottlebrush_Acropora", "mean_Branching_Acropora", "mean_Branching_non_Acropora", "mean_Capitate_Soft_Coral", "mean_Coralline_algae", # "mean_Dead_coral_recent", 
+                "mean_Digitate_Acropora", "mean_Encrusting_Acropora", "mean_Encrusting_non_Acropora", "mean_Encrusting_Soft_Coral", "mean_Foliose_non_Acropora", "mean_Lobate_Soft_Coral", # "mean_Macroalgae",
+                "mean_Massive_non_Acropora", "mean_Massive_Soft_Coral", "mean_Millepora", "mean_Mushroom_coral", "mean_Other_organisms", "mean_Rubble", "mean_Sand", "mean_Soft_Coral", "mean_Solitary_coral", "mean_Sponge", "mean_Submassive_Acropora", "mean_Submassive_non_Acropora", "mean_Tabulate_Acropora", "mean_Turf_algae", "mean_Unknown", "mean_Zoanthid", "mean_Fish_Biomass", "mean_Carnivore", "mean_Corallivore", "mean_Detritivore", "mean_Herbivore", "mean_Invertivore", "mean_Piscivore")
+
+# Copy the original data to preserve it
+cleaned_env_data <- continuous_env_MINT_sPLS
+
+# Define a named vector for manual renaming (old_name = new_name)
+new_names <- c(
+  # Chemical variables
+  "median_Chlorophyll_A_µg_L" = "Chl-A",
+  "median_Phaeophytin_A_µg_L" = "Phaeo",
+  "median_PN_µM" = "PN",
+  "median_POC_µM" = "POC",
+  "median_PP_µM" = "PP",
+  "median_DOC_µM" = "DOC",
+  "median_PO4_µM" = "PO4",
+  "median_NH4_µM" = "NH4",
+  "median_NO2_µM" = "NO2",
+  "median_NO3_µM" = "NO3",
+  "median_Si_µM" = "Si",
+  "median_TDN_µM" = "TDN",
+  "median_TDP_µM" = "TDP",
+  "median_TSS_mg_L" = "TSS",
+  
+  # Physical variables
+#  "SEAWATER_TEMPERATURE_2.5m_RV" = "Temp",
+#  "SALINITY_2.5m_RV" = "Salinity",
+  "FLUORESCENCE_2.5m_RV" = "Fluorescence",
+  
+  # Coral/benthic categories
+  "mean_Abiotic" = "Abiotic",
+  "mean_Arb_and_Enc_Soft_Coral" = "Arb_Enc_Soft_Coral",
+  "mean_Arborescent_Soft_Coral" = "Arborescent_Soft_Coral",
+  "mean_Bottlebrush_Acropora" = "Bottlebrush_Acropora",
+  "mean_Branching_Acropora" = "Branching_Acropora",
+  "mean_Branching_non_Acropora" = "Branching_non_Acropora",
+  "mean_Capitate_Soft_Coral" = "Capitate_Soft_Coral",
+  "mean_Coralline_algae" = "Coralline_algae",
+  "mean_Digitate_Acropora" = "Digitate_Acropora",
+  "mean_Encrusting_Acropora" = "Encrusting_Acropora",
+  "mean_Encrusting_non_Acropora" = "Encrusting_non_Acropora",
+  "mean_Encrusting_Soft_Coral" = "Encrusting_Soft_Coral",
+  "mean_Foliose_non_Acropora" = "Foliose_non_Acropora",
+  "mean_Lobate_Soft_Coral" = "Lobate_Soft_Coral",
+  "mean_Massive_non_Acropora" = "Massive_non_Acropora",
+  "mean_Massive_Soft_Coral" = "Massive_Soft_Coral",
+  "mean_Millepora" = "Millepora",
+  "mean_Mushroom_coral" = "Mushroom_coral",
+  "mean_Other_organisms" = "Other_organisms",
+  "mean_Rubble" = "Rubble",
+  "mean_Sand" = "Sand",
+  "mean_Soft_Coral" = "Soft_Coral",
+  "mean_Solitary_coral" = "Solitary_coral",
+  "mean_Sponge" = "Sponge",
+  "mean_Submassive_Acropora" = "Submassive_Acropora",
+  "mean_Submassive_non_Acropora" = "Submassive_non_Acropora",
+  "mean_Tabulate_Acropora" = "Tabulate_Acropora",
+  "mean_Turf_algae" = "Turf_algae",
+  "mean_Unknown" = "Unknown",
+  "mean_Zoanthid" = "Zoanthid",
+  
+  # Fish biomass
+  "mean_Fish_Biomass" = "Fish_biomass",
+  "mean_Carnivore" = "Carnivore",
+  "mean_Corallivore" = "Corallivore",
+  "mean_Detritivore" = "Detritivore",
+  "mean_Herbivore" = "Herbivore",
+  "mean_Invertivore" = "Invertivore",
+  "mean_Piscivore" = "Piscivore"
+)
+
+# Apply the new names
+names(cleaned_env_data) <- new_names[match(names(cleaned_env_data), names(new_names))]
+
+# Verify changes
+head(names(cleaned_env_data), 10)  # Check the first 10 names
+
+# Making sure X looks goos:
+OTUs_biplot_MINT <- MAGs_MINT
+# getting names for taxa
+OTUs_biplot_colnames_MINT <- left_join(otu_table(pMAGs_95ANI_phyloseq_CLR_per_sector) %>%
+                                    as.data.frame %>%
+                                    rownames_to_column("OTU"),
+                                  tax_table(pMAGs_95ANI_phyloseq_CLR_per_sector) %>%
+                                    as.data.frame %>%
+                                    rownames_to_column("OTU")) %>%
+  tidyr::unite(taxonomy, c(Order, Family, Genus, Species), sep = "; ") # Adding Taxonomy info
+## Joining, by = "OTU"
+OTUs_biplot_colnames_MINT <- OTUs_biplot_colnames_MINT %>% 
+  dplyr::select("OTU", "taxonomy")
+# Merging with the OTUs_biplot object
+OTUs_biplot_names_MINT <- left_join(t(OTUs_biplot_MINT) %>% 
+                           as.data.frame() %>% 
+                           rownames_to_column("OTU"),
+                         OTUs_biplot_colnames_MINT) %>% 
+  tidyr::unite(Annotations, c(OTU, taxonomy), sep = "_") %>% 
+  column_to_rownames("Annotations") %>%  # moving this as rowposing back into the right format
+  t() # trans
+
+# MINT sPLS with all metrics
+keepX_MINT_biplot <- c(100, 50)
+keepY <- c(15, 10)
+mint.spls2.fish.MAGs.sector.biplot <- mint.spls(
+  X = OTUs_biplot_names_MINT,
+  Y = cleaned_env_data,
+#  Y = metadata_with_fish_trophic_group_and_family[,c(5:18, 23:30, 32:59)],
+  ncomp = 2,
+  study = sample_data(pMAGs_95ANI_phyloseq_CLR_per_sector)$SECTOR_N_S,
+  keepX = keepX_MINT_biplot,
+  keepY = keepY,
+  mode = "regression"
+)
+
+# INPUT ARGUMENTS
+# management_status = metadata_for_MINT_sPLS_with_fish$Open_or_Closed_to_fishing
+# reef_names = metadata_for_MINT_sPLS_with_fish$REEF_NAME
+management_status = sample_data(pMAGs_95ANI_phyloseq_CLR_per_sector)$Open_or_Closed_to_fishing
+reef_names = sample_data(pMAGs_95ANI_phyloseq_CLR_per_sector)$REEF_NAME
+pch = mint.spls2.fish.MAGs.sector.biplot$study
+var.arrow.col.X = 'lightblue'
+var.arrow.col.Y = 'snow3'
+var.arrow.size = 0.5
+var.arrow.length = 0.2
+comp1 = 1
+comp2 = 2
+object <- mint.spls2.fish.MAGs.sector.biplot
+comp <- object$ncomp
+
+## --- Data Preparation ---
+plot_data <- data.frame(
+  Comp1 = object$variates$X[, comp1],
+  Comp2 = object$variates$X[, comp2],
+  Reef = reef_names,
+  Status = management_status,
+  Study = pch
+)
+
+# Aggregate coordinates by reef
+reef_data <- plot_data %>%
+  dplyr::group_by(Reef, Status) %>%
+  dplyr::summarize(
+    Comp1 = mean(Comp1),
+    Comp2 = mean(Comp2),
+    .groups = 'drop'
+  )
+
+## --- Variable Selection ---
+selection.X <- rowSums(object$loadings$X[, 1:comp]) != 0 
+selection.Y <- rowSums(object$loadings$Y[, 1:comp]) != 0 
+loadings.X <- data.frame(object$loadings$X[selection.X, ])
+loadings.Y <- data.frame(object$loadings$Y[selection.Y, ])
+
+# Correlation calculation
+cors.X <- cor(object$X[, selection.X], object$variates$X[, 1:comp], use = 'pairwise')
+cors.Y <- cor(object$Y[, selection.Y], object$variates$Y[, 1:comp], use = 'pairwise')
+
+## --- Scaling Factors (MODIFIED FOR BETTER VISUALIZATION) ---
+scaler.X <- max(object$variates$X, na.rm = TRUE)/max(abs(cors.X), na.rm = TRUE)
+scaler.Y <- max(object$variates$Y, na.rm = TRUE)/max(abs(cors.Y), na.rm = TRUE)
+
+# Key change: Increased Y scaling from 0.7 to 1.2 for better arrow projection
+cors.X <- cors.X*scaler.X*0.8  # Microbial vars (unchanged)
+cors.Y <- cors.Y*scaler.Y*1.2  # Environmental vars (increased projection)
+
+# Custom sector shapes
+sector_shapes <- c(
+  "01_Cape_Grenville" = 1,
+  "02_Princess_Charlotte_bay" = 2,
+  "06_Swains" = 6,
+  "03_Cairns" = 3,
+  "07_Capricorn_Bunker" = 7,
+  "05_Townsville" = 5,
+  "04_Innisfail" = 4
+)
+
+## --- Create Plot ---
+gg_biplot <- ggplot() + 
+  theme_classic() +  
+  labs(
+    x = 'Component 1', 
+    y = 'Component 2',
+    title = "MINT sPLS Sample plot: blocks XY combined",
+    color = "Reef Zoning",
+    shape = "Sector"
+  ) +
+  geom_vline(xintercept = 0, size = 0.3, col = 'grey75') +
+  geom_hline(yintercept = 0, size = 0.3, col = 'grey75') +
+  theme(
+    legend.position = "right",
+    legend.box = "vertical",
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
+    text = element_text(family = "Arial")
+  ) +
+  theme_classic()
+
+# 1. Connection lines
+gg_biplot <- gg_biplot +
+  geom_segment(
+    data = plot_data %>% left_join(reef_data, by = c("Reef", "Status"), suffix = c("", "_centroid")),
+    aes(x = Comp1, y = Comp2, xend = Comp1_centroid, yend = Comp2_centroid, color = Status),
+    alpha = 0.2, size = 0.3, show.legend = FALSE
+  )
+
+# 2. Status ellipses
+gg_biplot <- gg_biplot +
+  stat_ellipse(
+    data = plot_data,
+    aes(x = Comp1, y = Comp2, color = Status),
+    type = "norm", level = 0.95, size = 0.6, alpha = 1, show.legend = FALSE
+  )
+
+# 3. Individual samples
+gg_biplot <- gg_biplot + 
+  geom_point(
+    data = plot_data,
+    aes(x = Comp1, y = Comp2, color = Status, shape = Study),
+    size = 3, alpha = 0.6
+  ) +
+  scale_color_manual(values = c("C" = "seagreen3", "O" = "steelblue4")) +
+  scale_shape_manual(values = sector_shapes)
+
+# 4. Reef centroids
+gg_biplot <- gg_biplot +
+  geom_point(
+    data = reef_data,
+    aes(x = Comp1, y = Comp2, color = Status),
+    shape = 1, size = 3, stroke = 1.2, alpha = 0.8,
+  ) +
+  geom_text_repel(
+    data = reef_data,
+    aes(x = Comp1, y = Comp2, label = Reef, color = Status),
+    size = 3.2, max.overlaps = 40, point.padding = 0.2, show.legend = FALSE, alpha = 0.4
+  )
+
+# 5. Environmental variables with labels at arrow tips (allowing overlap)
+# First clean the labels by removing prefixes
+cleaned_labels <- gsub("^(mean_|sum_)", "", rownames(loadings.Y))
+
+gg_biplot <- gg_biplot + 
+  geom_segment(
+    aes(x = 0, y = 0, xend = cors.Y[,comp1], yend = cors.Y[,comp2]),
+    col = "black",
+    alpha = 0.2,
+    arrow = arrow(length = unit(0.2, "cm"), type = "closed"),
+    size = 0.7
+  ) +
+  ggrepel::geom_text_repel(
+    aes(x = cors.Y[,comp1],
+        y = cors.Y[,comp2],
+        label = cleaned_labels),  # Using cleaned labels here
+    color = "black",
+    fontface = "bold",
+    size = 5.5,
+    point.padding = 0.2,
+    min.segment.length = 0,
+    segment.color = "black",
+    segment.size = 0.4,
+    segment.alpha = 0.6,
+    max.iter = 10000,
+    direction = "both",
+    force = 0.5,
+    max.overlaps = Inf,
+    nudge_x = ifelse(cors.Y[,comp1] > 0, 0.02, -0.02),
+    nudge_y = ifelse(cors.Y[,comp2] > 0, 0.02, -0.02),
+    hjust = 0.5,
+    vjust = 0.5
+  )
+
+# Adjust legends
+gg_biplot <- gg_biplot +
+  guides(
+    color = guide_legend(override.aes = list(shape = 16, size = 3)),
+    shape = guide_legend(override.aes = list(size = 3.5))
+  )
+
+# Display the plot
+print(gg_biplot)
+
+# Export as pdf
+ggsave(
+  "/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/MINT_Biplot_Final.pdf",
+  plot = gg_biplot,
+  device = cairo_pdf,
+  width = 12,
+  height = 8,
+  units = "in"
+)
+```
+
+```{r MINT sPLS sector fish all partial sample plot, fig.height=6, fig.width=12, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+mint.spls2.fish.MAGs.partial.sample.plot.sector <- plotIndiv(mint.spls2.fish.MAGs.sector,
+          group = sample_data(pMAGs_95ANI_phyloseq_CLR_per_sector)$Open_or_Closed_to_fishing,
+          title = 'partial MINT sPLS: WQ & LTMP metrics | MAGs (95% ANI)-WQ',
+          legend = T,
+          ind.names = sample_names(pMAGs_95ANI_phyloseq_CLR_per_sector),
+          study = "all.partial",
+          rep.space = "XY-variate",
+          col.per.group = c("seagreen3", # Closed to fishing
+                            "steelblue4"), # Open to fishing
+          legend.title = 'Reef Management Status')
+```
+
+```{r MINT sPLS MAGs-all data Circle correlation plot with IMOS MGD MAGs sectors, fig.width = 7, fig.height=7, fig.cap="Correlation circle plot from the MINT sPLS2 performed on the MAGs/WQ & LTMP contrast. The plot highlights correlations within selected Indicator MAGs and how they correlate to water quality and benthic cover metrics on the first two dimensions of MINT sPLS2, and across the four sampling trips. This plot should be interpreted jointly with the sample plot above to better understand how the enrichment levels of these microbes may characterise specific sample groups.", fig.height=8, fig.width=8, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+plotVar(mint.spls2.fish.MAGs.sector,
+        var.names = list(X.label = MAGs.name.super.short,
+                         Y.label = TRUE),
+        cutoff = 0.45,
+        cex = c(3,4))
+```
+
+Heatmap (Fig 3B)
+
+```{r MINT sPLS MAGs-Fish on global dataset, fig.width = 21, fig.height=40, fig.cap="MINT sPLS - MAGs/All env. metrics. Microbial taxa that were identified as indicators are shown on the y axis, while WQ measurements are shown on the x axis. These molecular signatures are shared across the four sampling transects. The scale shows similarity values (partial correlations) between the X and Y variables selected across the first two sPLS dimensions, and clustered with a complete Euclidean distance method. The color indicates either positive (red) or negative (blue) correlation.", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+cim(mint.spls2.fish.MAGs.sector,
+    comp = 1:2,
+#    cutoff = 0.3,
+    xlab = "WQ & LTMP parameters",
+    ylab = "Indicator MAGs",
+    margins = c(19, # bottom
+                50), # right
+    row.names = MAGs.full.name.and.OTU,
+    symkey = FALSE,
+    keysize = c(1, 0.4),
+    title = "MINT sPLS MAGs/WQ (PCs 1 and 2), Sector as MINT study")
+```
+
+Just pulling out the taxa that were identified as indicators in MINT sPLS-DA - those are the correlations I wish to identify here.
+
+```{r Heatmap from MINT sPLS on all data but only pulling out the 60, fig.width = 20, fig.height=40, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+mint_spls_link_da <- mint.spls(X = OTUs_biplot_names_MINT, 
+                               Y = continuous_env_MINT_sPLS,
+                           ncomp = 2,
+                           study = sample_data(pMAGs_95ANI_phyloseq_CLR_per_sector)$SECTOR_N_S,
+#                           study = sample_data(pMAGs_95ANI_phyloseq_clr)$Sampling_trip,
+#                           keepX = c(800, 800), # 70 taxa on dims 1 and 2
+                           keepY = keepY,
+                           mode = "regression")
+
+mint_spls_link_da_inds <- cim(mint.spls2.fish.MAGs.sector,
+    comp = 1:2,
+#    cutoff = 0.3,
+    xlab = "WQ & LTMP parameters",
+    ylab = "Indicator MAGs",
+    margins = c(19, # bottom
+                50), # right
+    row.names = MAGs.full.name.and.OTU,
+    symkey = FALSE,
+    keysize = c(1, 0.4),
+    title = "MINT sPLS MAGs/WQ (PCs 1 and 2), Sector as MINT study")
+
+mint_spls_link_da_inds <- mint_spls_link_da_inds$mat %>% 
+  as.data.frame() %>% 
+  rownames_to_column("OTU")
+
+# Adding taxonomy info to the MINT sPLS-DA indicator MAGs with modifications
+loading.plots.rawgraphs.sectors_taxonomy_MINT <- left_join(loading.plots.rawgraphs.sectors,
+                                               tax_table(pMAGs_95ANI_phyloseq_CLR_per_sector) %>%
+                              as.data.frame %>%
+                              rownames_to_column("OTU")) %>%
+  # Remove unwanted columns
+  dplyr::select(-Domain, -Phylum, -Class) %>%
+  # Combine taxonomy info
+  tidyr::unite(OTU, c(OTU, Order, Family, Genus, Species), sep = "; ") %>% 
+  # Modify the OTU string format
+  dplyr::mutate(OTU = str_replace(OTU, "; o__", "_o__"))
+
+# Now only selecting the pMAGs of interest in MINT sPLS-DA
+mint_spls_linked_mint_splsda <- left_join(loading.plots.rawgraphs.sectors_taxonomy_MINT, mint_spls_link_da_inds)
+
+# Lastly, adding back the taxonomy info
+#mint_spls_linked_mint_splsda_taxa <- left_join(mint_spls_linked_mint_splsda,
+#                                               tax_table(pMAGs_95ANI_phyloseq_CLR_per_sector) %>%
+#                              as.data.frame %>%
+#                              rownames_to_column("OTU")) %>%
+#  tidyr::unite(MAG_ID_taxonomy, c(OTU, Domain, Phylum, Class, Order, Family, Genus, Species), sep = "; ") %>%   # Adding Taxonomy info
+#  column_to_rownames("MAG_ID_taxonomy")
+
+
+# Define a custom color palette
+color_palette <- colorRampPalette(c("#5e4ea1ff", "#ffffbfff", "#9e0041ff"))(10)
+
+# Prepare your data
+heatmap_data <- mint_spls_linked_mint_splsda[, c(1, 9:33)] %>% 
+  column_to_rownames("OTU")
+
+# First, make sure your heatmap_data rows match the desired order
+ordered_heatmap_data <- heatmap_data[loading.plots.rawgraphs.sectors_taxonomy_MINT$OTU, ]
+
+# Then create the heatmap without row clustering
+MINT_sPLS_heatmap_ordered <- pheatmap(ordered_heatmap_data,
+         color = color_palette,
+         show_rownames = TRUE,
+         cluster_rows = TRUE,  # Disable row clustering
+         cluster_cols = TRUE,  # Keep column clustering if desired
+         display_numbers = F)
+```
+
+```{r Categorical Heatmap from MINT sPLS matching the one above, fig.width = 10, fig.height=40, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# Now also coloring rows based on indicator taxa
+heatmap_data_inds_col <- mint_spls_linked_mint_splsda
+heatmap_data_inds_col$Overall_GroupContrib <- apply(heatmap_data_inds_col[, c("X01_Cape_Grenville.GroupContrib", "X02_Princess_Charlotte_bay.GroupContrib", "X03_Cairns.GroupContrib", "X04_Innisfail.GroupContrib", "X05_Townsville.GroupContrib", "X06_Swains.GroupContrib", "X07_Capricorn_Bunker.GroupContrib")], 1, function(row) {
+  # Count the occurrences of "O", "C", and "Not_discriminative_in_MINT_sPLS-DA"
+  o_count <- sum(row == "O")
+  c_count <- sum(row == "C")
+  non_indicative_count <- sum(row == "Not_discriminative_in_MINT_sPLS-DA")
+  
+  # Check if "Not_discriminative_in_MINT_sPLS-DA" is in the row
+  if (non_indicative_count > 0) {
+    return("Not_discriminative_in_MINT_sPLS-DA")
+  }
+  
+  # Assign "O" or "C" based on prevalence
+  if (o_count > c_count) {
+    return("O")
+  } else {
+    return("C")
+  }
+})
+# Selecting only the inds
+heatmap_data_inds_col <- heatmap_data_inds_col %>% 
+  dplyr::select("OTU", "Overall_GroupContrib")
+  
+# Make sure the order of taxa will be identical in both categorical and continuous heatmaps
+heatmap_row_order <- rownames(ordered_heatmap_data[MINT_sPLS_heatmap_ordered$tree_row$order, ])
+
+# Then reorder the indicator data to match the heatmap
+heatmap_data_inds_col_ordered <- heatmap_data_inds_col %>%
+  mutate(OTU = factor(OTU, levels = heatmap_row_order)) %>%
+  arrange(OTU) %>%
+  column_to_rownames("OTU")
+
+# Verify the order matches
+identical(rownames(heatmap_data_inds_col_ordered), heatmap_row_order)
+
+# First, ensure your data is properly formatted
+heatmap_data_inds_col_ordered <- heatmap_data_inds_col_ordered %>%
+  rownames_to_column("OTU") %>%
+  mutate(Overall_GroupContrib = factor(Overall_GroupContrib)) %>%
+  column_to_rownames("OTU")
+
+# Create a simple matrix where all values are the same (since we just want the color coding)
+# We'll use 1 for all entries since the actual value doesn't matter for coloring
+categorical_matrix <- matrix(1, 
+                            nrow = nrow(heatmap_data_inds_col_ordered),
+                            ncol = 1,
+                            dimnames = list(rownames(heatmap_data_inds_col_ordered), "Group"))
+
+# Define the color scheme
+group_colors <- c("O" = "steelblue4", 
+                 "C" = "seagreen3",
+                 "Not_discriminative_in_MINT_sPLS-DA" = "gray80")  # Adding a neutral color for non-discriminative
+
+# Create the annotation data frame
+annotation_df <- data.frame(Group = heatmap_data_inds_col_ordered$Overall_GroupContrib)
+rownames(annotation_df) <- rownames(heatmap_data_inds_col_ordered)
+
+# Create the heatmap
+categorical_mint_spls_heatmap <- heatmap_data_inds_col_ordered %>%
+  rownames_to_column("OTU") %>%
+  mutate(OTU = factor(OTU, levels = heatmap_row_order)) %>%  # Use your ordered levels
+  ggplot(aes(x = 1, y = OTU, fill = Overall_GroupContrib)) +
+  geom_tile() +
+  scale_fill_manual(values = c("O" = "steelblue", 
+                              "C" = "seagreen3",
+                              "Not_discriminative_in_MINT_sPLS-DA" = "gray80")) +
+  theme_minimal() +
+  theme(axis.text.x = element_blank(),
+        axis.title = element_blank(),
+        panel.grid = element_blank()) +
+  labs(title = "Indicator Taxa Classification",
+       fill = "Group Contribution")
+categorical_mint_spls_heatmap
+```
+
+Let's also see the actual numbers
+
+```{r MINT sPLS correlation scores as mean and SD, fig.width = 12, fig.height=10, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# 1. Prepare the data - merge correlations with indicator status
+combined_data <- left_join(ordered_heatmap_data %>% rownames_to_column("OTU"),
+                           heatmap_data_inds_col_ordered %>% rownames_to_column("OTU")) %>% 
+  column_to_rownames("OTU")
+
+discriminative_data <- combined_data %>% 
+  dplyr::filter(Overall_GroupContrib %in% c("C", "O")) %>%
+  mutate(Overall_GroupContrib = factor(Overall_GroupContrib))
+
+# I will compute the mean and SD values manually to create Table_S6.xlsx
+write.csv(discriminative_data, file = "/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/Writing/Supplementary_Material/Supplementary_Tables/Table_S6.csv")
+```
+
+Actually, first let's order based on the indicator pMAGs from MINT sPLS_DA
+
+```{r MINT sPLS MAGs-Fish on global dataset export for rawgraphs, fig.width = 22, fig.height=30, fig.cap="MINT sPLS - MAGs/All env. metrics. Microbial taxa that were identified as indicators are shown on the y axis, while WQ measurements are shown on the x axis. These molecular signatures are shared across the seven GBR sectors. The scale shows similarity values (partial correlations) between the X and Y variables selected across the first two sPLS dimensions, and clustered with a complete Euclidean distance method. The color indicates either positive (red) or negative (blue) correlation.", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# Visualising the MAGs and env. metrics selected in MINT sPLS
+mint.spls.MAGs.all.rawgraphs <- cim(mint.spls2.fish.MAGs.sector,
+    comp = 1:2,
+#    cutoff = 0.3,
+    xlab = "WQ & LTMP parameters",
+    ylab = "Indicator MAGs",
+    margins = c(19, # bottom
+                53), # right
+    row.names = MAGs.name.full,
+    symkey = FALSE,
+    keysize = c(1, 0.4),
+    title = "MINT sPLS MAGs/WQ (PCs 1 and 2)")
+
+# Making a final object for RawGraphs
+rawgraphs.mint.spls.order <- mint.spls.MAGs.all.rawgraphs$row.names %>% 
+  as.data.frame() %>% 
+  tidyr::separate(., col = ., into = c("OTU", "Domain", "Phylum", "Class", "Order", "Family", "Genus", "Species"), sep = "; ") # Separating again
+rawgraphs.mint.spls.order_GroupContrib <- left_join(loading.plots.rawgraphs.sectors, rawgraphs.mint.spls.order)
+
+# Exporting :)
+write.csv(rawgraphs.mint.spls.order_GroupContrib, file = "/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/MINT_sPLS_for_rawgraphs_sector.csv", row.names = F, quote = F)
+```
+
+```{r Heatmap GroupContrib sectors with MINT sPLS indicators, fig.height=40, fig.width=6, fig.cap="Saving as R object for rawgraphs.", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# Trying to make a heatmap now that would link MINT sPLS and MINT sPLS-DA indicators 
+
+# Reordering to have the same order as in the MINT sPLS heatmap
+# Used the solution from here:
+# https://syntaxfix.com/question/22528/how-do-you-specifically-order-ggplot2-x-axis-instead-of-alphabetical-order
+heatmap_data_OTU_order <- rownames(heatmap_data)[MINT_sPLS_heatmap_ordered$tree_row$order] %>%
+  as.data.frame(stringsAsFactors = FALSE) %>%  # Prevents factor conversion
+  transmute(OTU = gsub("_o__", "; o__", .))  # Use transmute instead of mutate to keep only OTU column
+
+# Now separating MAG ID info from the GTDB taxonomy
+heatmap_data_OTU_order <- tidyr::separate(heatmap_data_OTU_order,
+                                          col = OTU,
+                                          into = c("OTU", # "Domain", "Phylum", "Class",
+                                                   "Order", "Family", "Genus", "Species"), sep = "; ")
+
+MINT_sPLS_group.contrib.order.sectors <- rawgraphs.mint.spls.order_GroupContrib$OTU %>% 
+  as.data.frame()
+colnames(MINT_sPLS_group.contrib.order.sectors) <- "OTU"
+MINT_sPLS_loading.plots.rawgraphs.sectors <- left_join(MINT_sPLS_group.contrib.order.sectors,
+                                                       loading.plots.rawgraphs.sectors)
+
+# And lastly, plotting group contrib as a heatmap
+MINT_sPLS_loading.plots.long.sectors <- pivot_longer(MINT_sPLS_loading.plots.rawgraphs.sectors,
+                                                     colnames(loading.plots.rawgraphs.sectors[,2:8]))
+# First, ensure your value column is a factor
+MINT_sPLS_loading.plots.long.sectors$value <- factor(MINT_sPLS_loading.plots.long.sectors$value)
+
+# Then plot with manual color scale
+ggplot(MINT_sPLS_loading.plots.long.sectors,
+       aes(y = factor(OTU, levels = unique(heatmap_data_OTU_order$OTU)),
+           x = name,
+           fill = value)) +
+  geom_tile(color = "white") +  # Add white borders for clarity
+  scale_fill_manual(values = c("C" = "seagreen3",  # Explicitly mapping values to colors
+                               "O" = "steelblue4"),
+                    name = "Group") +
+  scale_y_discrete(limits = rev(unique(heatmap_data_OTU_order$OTU))) +
+  labs(x = 'GBR sectors',
+       y = "Indicator MAGs",
+       title = 'Take vs. no-take zones') +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 12),
+        axis.text.y = element_text(size = 8))  # Adjust y-axis text size
+```
+
+Making Fig 3B now
+
+```{r Heatmap GroupContrib sectors with MINT sPLS env variables, fig.height=40, fig.width=40, fig.cap="Saving as R object for rawgraphs.", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+
+# Making a final object for RawGraphs
+rawgraphs.mint.spls.order.env <- colnames(heatmap_data)[MINT_sPLS_heatmap_ordered$tree_col$order] %>%
+  as.data.frame()
+
+# Now re-doing MINT sPLS-DA to have more env. metrics
+final.mint.splsda.open.closed.env.loading.plots <- mint.splsda(X = continuous_env_MINT_sPLS,
+  # X = metadata_for_MINT_sPLS_with_fish[,c(6:21,23:60)],
+                                             Y = pMAGs_95ANI_phyloseq_CLR_per_sector@sam_data$Open_or_Closed_to_fishing,
+                                             keepX = c(50, 50),
+#                                             keepX = c(50, 50, 50), # Uncomment for arbitrary number of features
+                                             study = pMAGs_95ANI_phyloseq_CLR_per_sector@sam_data$SECTOR_N_S,
+                                             ncomp = 2) # based on the BER
+
+# Getting group assignments for the env metrics selected on MINT sPLS-DA component 1 - info in loading plots
+loading.plots.open.closed.env.sectors.dim1 <- plotLoadings(final.mint.splsda.open.closed.env.loading.plots,
+             contrib = "max",
+             method = 'mean',
+             comp=1,
+             legend = TRUE,
+             legend.color = c("seagreen3", # Closed
+                              "steelblue4"), # Open
+#             ndisplay = 30,
+#             name.var = MAGs.name.short,
+             study="all.partial",
+             title="Contribution on comp 1"
+#             subtitle = paste("Study",1:4)
+             )
+
+# Converting this info into a data frame
+loading.plots.open.closed.env.sectors.dim1 <- loading.plots.open.closed.env.sectors.dim1 %>%
+  as.data.frame() # converting to data frame
+loading.plots.open.closed.env.sectors.dim1 <- loading.plots.open.closed.env.sectors.dim1 %>%
+  dplyr::select(ends_with("GroupContrib")) %>% 
+  rownames_to_column("Env_metrics")
+
+# Getting group assignments for the env metrics selected on MINT sPLS-DA component 2 - info in loading plots
+loading.plots.open.closed.env.sectors.dim2 <- plotLoadings(final.mint.splsda.open.closed.env.loading.plots,
+             contrib = "max",
+             method = 'mean',
+             comp=2,
+             legend = TRUE,
+             legend.color = c("seagreen3", # Closed
+                              "steelblue4"), # Open
+#             ndisplay = 30,
+#             name.var = MAGs.name.short,
+             study="all.partial",
+             title="Contribution on comp 1"
+#             subtitle = paste("Study",1:4)
+             )
+
+# Converting this info into a data frame
+loading.plots.open.closed.env.sectors.dim2 <- loading.plots.open.closed.env.sectors.dim2 %>%
+  as.data.frame() # converting to data frame
+loading.plots.open.closed.env.sectors.dim2 <- loading.plots.open.closed.env.sectors.dim2 %>%
+  dplyr::select(ends_with("GroupContrib")) %>% 
+  rownames_to_column("Env_metrics")
+
+# Merge the dataframes by row binding them
+loading.plots.open.closed.env.sectors <- rbind(loading.plots.open.closed.env.sectors.dim1,
+                                               loading.plots.open.closed.env.sectors.dim2)
+
+# Keep only unique rows based on all columns
+loading.plots.open.closed.env.sectors <- unique(loading.plots.open.closed.env.sectors)
+
+# Ordering so that it's the same order of metrics in the MINT sPLS heatmap
+colnames(rawgraphs.mint.spls.order.env) <- "Env_metrics"
+rawgraphs.mint.spls.order.env_GroupContrib <- left_join(rawgraphs.mint.spls.order.env,
+                                                        loading.plots.open.closed.env.sectors)
+
+# Reordering to have the same order as in the MINT sPLS heatmap
+# Used the solution from here:
+# https://syntaxfix.com/question/22528/how-do-you-specifically-order-ggplot2-x-axis-instead-of-alphabetical-order
+MINT_sPLS_group.contrib.order.sectors.env <- rawgraphs.mint.spls.order.env_GroupContrib$Env_metrics %>% 
+  as.data.frame()
+colnames(MINT_sPLS_group.contrib.order.sectors.env) <- "Env_metrics"
+MINT_sPLS_loading.plots.rawgraphs.sectors.env <- left_join(MINT_sPLS_group.contrib.order.sectors.env,
+                                                       loading.plots.open.closed.env.sectors)
+
+# And lastly, plotting group contrib as a heatmap
+MINT_sPLS_loading.plots.long.sectors.env <- pivot_longer(MINT_sPLS_loading.plots.rawgraphs.sectors.env,
+                                                     colnames(loading.plots.open.closed.env.sectors[,2:8]))
+```
+
+```{r Heatmap GroupContrib sectors with MINT sPLS indicators final, fig.height=12, fig.width=6, fig.cap="Saving as R object for rawgraphs.", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# Plotting
+ggplot(MINT_sPLS_loading.plots.long.sectors.env,                                # Draw heatmap-like plot
+       aes(y=factor(Env_metrics, level = unique(MINT_sPLS_loading.plots.rawgraphs.sectors.env$Env_metrics)), # Ordering in the same order as on the cim heatmap
+           x=name,
+           fill = value)) +
+  geom_tile() + # plot a heatmap
+  scale_fill_manual(values = c("seagreen3", # No-take zones
+                               "steelblue4",
+                               "grey")) + # Take zones
+    labs(x = 'AIMS-LTMP sectors',
+       y = "Environmental metrics",
+       title = 'Take vs. no-take zones') +
+      theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 12))
+```
+
+# MINT sPLS for Steve:
+## 876 IMOS-MGD MAGs (95% ANI) - correlating to ***continuous WQ metrics***
+
+We attempted MINT (Multivariate INTegration, Rohart et al. (2017b)), a method based on multi-group PLS that includes information about samples belonging to independent groups or studies (Eslami et al., 2014). In this context, the challenge was to accommodate for confounding effects between season and geography as each site was sampled only once in time and space. By using MINT sPLS, we aimed to identify microbial Indicator MAGs that correlate to water chemistry metrics and are shared across the 7 GBR sectors we sampled, regardless of geography or season. In MINT sPLS we retained two dimensions and 50 MAGs per dimension for the X datasets, and all WQ metrics for the Y dataset.
+
+```{r MINT sPLS MAGs-WQ, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# MINT sPLS - MAGs:WQ
+keepX <- c(50, 50)
+mint.spls2.WQ.MAGs <- mint.spls(X = MAGs,
+                           Y = metadata_IMOS_MGD_MAGs[,c(88:103, 105)],
+                           ncomp = 2,
+                           study = sample_data(pMAGs_95ANI_phyloseq_clr)$SECTOR,
+                           keepX = keepX, # 50 taxa on dims 1 and 2
+                           mode = "regression")
+```
+
+```{r MINT sPLS MAGs-WQ sample plot colored per trip, fig.height=5, fig.width=7, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, fig.show='hide', fig.cap="."}
+mint.spls2.WQ.MAGs.global.sample.plot.trip <- plotIndiv(mint.spls2.WQ.MAGs,
+          group = sample_data(pMAGs_95ANI_phyloseq_clr)$Sampling_trip,
+          title = 'global MINT sPLS | 876 MAGs (95% ANI)-physico-chemical metrics',
+          legend = T,
+          rep.space = "XY-variate",
+          ind.names = sample_names(pMAGs_95ANI_phyloseq_clr),
+          col.per.group =c("indianred", # Sampling trip 1
+                "indianred4", # Sampling trip 2 
+                "red3", # Sampling trip 3
+                "slateblue"), # Sampling trip 4
+          legend.title = 'Sampling Trip')
+```
+
+```{r MINT sPLS MAGs-WQ sample plot colored per zoning, fig.height=5, fig.width=7, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, fig.show='hide', fig.cap="."}
+mint.spls2.WQ.MAGs.global.sample.plot.zoning <- plotIndiv(mint.spls2.WQ.MAGs,
+          group = sample_data(pMAGs_95ANI_phyloseq_clr)$Open_or_Closed_to_fishing,
+          title = 'global MINT sPLS | 876 MAGs (95% ANI)-physico-chemical metrics',
+          legend = T,
+          rep.space = "XY-variate",
+          ind.names = sample_names(pMAGs_95ANI_phyloseq_clr),
+          col.per.group = c("seagreen3", # Closed to fishing
+                            "steelblue4"), # open to fishing
+          legend.title = 'Reef Zoning')
+```
+
+```{r per study MINT sPLS MAGs-WQ sample plot colored per trip, fig.height=8, fig.width=10, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, fig.show='hide'}
+mint.spls2.WQ.MAGs.partial.sample.plot.trips <- plotIndiv(mint.spls2.WQ.MAGs,
+          group = sample_data(pMAGs_95ANI_phyloseq_clr)$Sampling_trip,
+          title = 'partial MINT sPLS | 876 MAGs (95% ANI)-physico-chemical metrics',
+          legend = T,
+          ind.names = sample_names(pMAGs_95ANI_phyloseq_clr),
+          study = "all.partial",
+          rep.space = "XY-variate",
+          col.per.group =c("indianred", # Sampling trip 1
+                "indianred4", # Sampling trip 2 
+                "red3", # Sampling trip 3
+                "slateblue"), # Sampling trip 4
+          legend.title = 'Sampling Trip')
+```
+
+```{r per study MINT sPLS MAGs-WQ sample plot colored per zoning, fig.height=8, fig.width=10, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, fig.show='hide'}
+mint.spls2.WQ.MAGs.partial.sample.plot.zoning <- plotIndiv(mint.spls2.WQ.MAGs,
+          group = sample_data(pMAGs_95ANI_phyloseq_clr)$Open_or_Closed_to_fishing,
+          title = 'partial MINT sPLS | 876 MAGs (95% ANI)-physico-chemical metrics',
+          legend = T,
+          ind.names = sample_names(pMAGs_95ANI_phyloseq_clr),
+          study = "all.partial",
+          rep.space = "XY-variate",
+          col.per.group = c("seagreen3", # Closed to fishing
+                            "steelblue4"), # open to fishing
+          legend.title = 'Reef Zoning')
+```
+
+```{r MINT sPLS MAGs-WQ Circle correlation plot with ind taxa, fig.width = 7, fig.height=7, fig.cap="Correlation circle plot from the MINT sPLS2 performed on the MAGs/WQ contrast. The plot highlights correlations within selected Indicator MAGs and how they correlate to water chemistry metrics on the first two dimensions of sPLS2, and across the four sampling trips. This plot should be interpreted jointly with the sample plot above to better understand how the enrichment levels of these microbes may characterise specific sample groups. Overall, on dimension 1 sites separately cluster based on the ratio of particulate/dissolved organic matter.", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+plotVar(mint.spls2.WQ.MAGs,
+        var.names = list(X.label = MAGs.name.super.short,
+                         Y.label = TRUE),
+        cex = c(3,4))
+```
+
+```{r MINT sPLS MAGs-WQ on global dataset, fig.width = 12, fig.height=14, fig.cap="MINT sPLS - MAGs MetaPhlAn/WQ. Microbial taxa that were identified as indicators are shown on the y axis, while WQ measurements are shown on the x axis. These molecular signatures are shared across the four sampling transects. The scale shows similarity values (partial correlations) between the X and Y variables selected across the first two sPLS dimensions, and clustered with a complete Euclidean distance method. The color indicates either positive (red) or negative (blue) correlation.", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# Steve asked me to color the rows based on phylum info:
+mint.spls.biomarkers.dim1 <- rownames(mint.spls2.WQ.MAGs$loadings$X)[which(mint.spls2.WQ.MAGs$loadings$X[,1] != 0)]
+mint.spls.biomarkers.dim2 <- rownames(mint.spls2.WQ.MAGs$loadings$X)[which(mint.spls2.WQ.MAGs$loadings$X[,2] != 0)]
+# Combining into a single df:
+mint.spls.biomarkers <- data.frame(Biomarkers = c(mint.spls.biomarkers.dim1, mint.spls.biomarkers.dim2))
+
+# Now adding the taxonomy info:
+mint.spls.biomarkers.tax <- left_join(mint.spls.biomarkers,
+                                      pMAGs_95ANI_phyloseq_clr@tax_table %>%
+                                        as.data.frame() %>%
+                                        rownames_to_column("Biomarkers"))
+
+### Now let's add a color for each phylum:
+# Get unique values from the Phylum column
+unique_phyla <- unique(mint.spls.biomarkers.tax$Phylum)
+
+# Print the unique values
+print(unique_phyla)
+# OK, look's like we have 11 phyla as indicators
+
+# OK, now assigning color to each of the 23 unique phyla
+phylum_colors <- c(
+  "Pseudomonadota"       = "skyblue2",            # Pseudomonadota
+  "Thermoplasmatota"     = "lightgoldenrod1",     # Thermoplasmatota
+  "Myxococcota"          = "plum2",               # Myxococcota
+  "Bacteroidota"         = "salmon1",             # Bacteroidota
+  "Verrucomicrobiota"    = "tan1",                # Verrucomicrobiota
+  "Desulfobacterota_D"   = "rosybrown4",          # Desulfobacterota_D
+  "Margulisbacteria"     = "skyblue1",            # Margulisbacteria
+  "Cyanobacteriota"      = "darkseagreen3",       # Cyanobacteriota
+  "Actinomycetota"       = "slateblue4",          # Actinomycetota
+  "Chloroflexota"        = "slateblue3",          # Chloroflexota
+  "Planctomycetota"      = "mediumpurple1",       # Planctomycetota
+  "Bdellovibrionota"     = "lightblue",           # Bdellovibrionota
+  "Dependentiae"         = "khaki",               # Dependentiae
+  "Asgardarchaeota"      = "violetred1",          # Asgardarchaeota
+  "Marinisomatota"       = "tomato2",             # Marinisomatota
+  "Patescibacteria"      = "lavenderblush3",      # Patescibacteria
+  "SAR324"               = "indianred",           # SAR324
+  "Thermoproteota"       = "navajowhite2",        # Thermoproteota
+  "UBP17"                = "tomato1",             # UBP17
+  "Bacillota"            = "rosybrown",           # Bacillota
+  "Latescibacterota"     = "wheat1",              # Latescibacterota
+  "Nanoarchaeota"        = "palegoldenrod",       # Nanoarchaeota
+  "Chlamydiota"          = "olivedrab"            # Chlamydiota
+)
+
+# Now you can use `row_colors` in your heatmap or other visualization
+cim(mint.spls2.WQ.MAGs,
+    comp = 1:2,
+    xlab = "WQ parameters",
+    ylab = "Indicator MAGs",
+    margins = c(19, # bottom
+                33), # right
+    row.names = MAGs.name.full,
+    symkey = FALSE,
+    keysize = c(1, 0.4),
+    title = "MINT sPLS MAGs/WQ (PCs 1 and 2)"
+#    row.sideColors = row_colors
+)
+```
+
+## MINT sPLS for Steve - looking only at the 60 mmost discriminatory MAGs identified in MINT sPLS-DA
+
+```{r Loading plots per trip, fig.height=8, fig.width=15, fig.cap="Loading plots of the MAGs selected by the MINT sPLS-DA on component 1 to discriminate between reefs that are open and closed to fishing, across sampling trips. Each plot represents one IMOS MGD transect, and the indicator MAGs are coloured according to the reef type (open or closed) they are maximally expressed in, on average. The length of the bars indicate the loading coefficient values that define the component. Several MAGs distinguish between reefs that are open or closed to fishing, and are consistently overexpressed in these samples across all sampling transects. The top 30 most influential/discriminant MAGs (on component 1) are shown.", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, results='hide', fig.show='hide'}
+loading.plots.for.Steve <- plotLoadings(final.mint.splsda.open.closed.sector.DB_paper,
+             contrib = "max",
+             method = 'mean',
+             comp=1,
+             legend = TRUE,
+             legend.color = c("seagreen3", # Closed
+                              "steelblue4"), # Open
+             ndisplay = 60,
+#             name.var = MAGs.name.short,
+             study="all.partial",
+             title="Contribution on comp 1",
+#             subtitle = paste("Study",1:4)
+             )
+# Making a list of MAGs
+list.MAGs.Steve <- rownames(loading.plots.for.Steve$`CG`) %>% as.data.frame()
+colnames(list.MAGs.Steve) <- "OTU"
+# Now subsetting the MAGs df
+MAGs_Steve_60 <- left_join(list.MAGs.Steve,
+                           t(MAGs) %>% as.data.frame() %>% rownames_to_column("OTU")) %>% 
+  column_to_rownames("OTU") %>% 
+  t()
+# Done!
+```
+
+```{r MINT sPLS MAGs-WQ Steve, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# MINT sPLS - MAGs:WQ
+keepX_Steve <- c(30, 30)
+mint.spls2.WQ.MAGs.Steve <- mint.spls(X = MAGs_Steve_60,
+                           Y = metadata_IMOS_MGD_MAGs[,c(88:103, 105)],
+                           ncomp = 2,
+                           study = sample_data(pMAGs_95ANI_phyloseq_clr)$Sampling_trip,
+                           keepX = keepX_Steve, # 50 taxa on dims 1 and 2
+                           mode = "regression")
+```
+
+```{r MINT sPLS MAGs-WQ sample plot colored per trip Steve, fig.height=5, fig.width=7, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, fig.show='hide', fig.cap="."}
+mint.spls2.WQ.MAGs.global.sample.plot.trip.Steve <- plotIndiv(mint.spls2.WQ.MAGs.Steve,
+          group = sample_data(pMAGs_95ANI_phyloseq_clr)$Sampling_trip,
+          title = 'global MINT sPLS | MAGs (95% ANI)-WQ',
+          legend = T,
+          rep.space = "XY-variate",
+          ind.names = sample_names(pMAGs_95ANI_phyloseq_clr),
+          col.per.group =c("indianred", # Sampling trip 1
+                "indianred4", # Sampling trip 2 
+                "red3", # Sampling trip 3
+                "slateblue"), # Sampling trip 4
+          legend.title = 'Sampling Trip')
+```
+
+```{r MINT sPLS MAGs-WQ sample plot colored per zoning Steve, fig.height=5, fig.width=7, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, fig.show='hide', fig.cap="."}
+mint.spls2.WQ.MAGs.global.sample.plot.zoning.Steve <- plotIndiv(mint.spls2.WQ.MAGs.Steve,
+          group = sample_data(pMAGs_95ANI_phyloseq_clr)$Open_or_Closed_to_fishing,
+          title = 'global MINT sPLS | MAGs (95% ANI)-WQ',
+          legend = T,
+          rep.space = "XY-variate",
+          ind.names = sample_names(pMAGs_95ANI_phyloseq_clr),
+          col.per.group = c("seagreen3", # Closed to fishing
+                            "steelblue4"), # open to fishing
+          legend.title = 'Reef Zoning')
+```
+
+```{r per study MINT sPLS MAGs-WQ sample plot colored per trip Steve, fig.height=8, fig.width=10, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, fig.show='hide'}
+mint.spls2.WQ.MAGs.partial.sample.plot.trips.Steve <- plotIndiv(mint.spls2.WQ.MAGs.Steve,
+          group = sample_data(pMAGs_95ANI_phyloseq_clr)$Sampling_trip,
+          title = 'partial MINT sPLS | MAGs (95% ANI)-WQ',
+          legend = T,
+          ind.names = sample_names(pMAGs_95ANI_phyloseq_clr),
+          study = "all.partial",
+          rep.space = "XY-variate",
+          col.per.group =c("indianred", # Sampling trip 1
+                "indianred4", # Sampling trip 2 
+                "red3", # Sampling trip 3
+                "slateblue"), # Sampling trip 4
+          legend.title = 'Sampling Trip')
+```
+
+```{r per study MINT sPLS MAGs-WQ sample plot colored per zoning Steve, fig.height=8, fig.width=10, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, fig.show='hide'}
+mint.spls2.WQ.MAGs.partial.sample.plot.zoning.Steve <- plotIndiv(mint.spls2.WQ.MAGs.Steve,
+          group = sample_data(pMAGs_95ANI_phyloseq_clr)$Open_or_Closed_to_fishing,
+          title = 'partial MINT sPLS | MAGs (95% ANI)-WQ',
+          legend = T,
+          ind.names = sample_names(pMAGs_95ANI_phyloseq_clr),
+          study = "all.partial",
+          rep.space = "XY-variate",
+          col.per.group = c("seagreen3", # Closed to fishing
+                            "steelblue4"), # open to fishing
+          legend.title = 'Reef Zoning')
+```
+
+```{r MINT sPLS MAGs-WQ sample plots combined trip Steve, fig.height=11, fig.width=11, fig.cap="Sample plot from the MINT sPLS performed on the MAGs/WQ contrast, showing both global (above) and partial (below) components from the MINT sPLS model. Samples are projected into the space spanned by the first two components, and coloured/assigned symbols by their sampling trip.", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+patchwork::wrap_plots(mint.spls2.WQ.MAGs.global.sample.plot.trip.Steve$graph,
+                      mint.spls2.WQ.MAGs.partial.sample.plot.trips.Steve$graph, nrow = 2)
+```
+
+```{r MINT sPLS MAGs-WQ sample plots combined zoning Steve, fig.height=11, fig.width=11, fig.cap="Sample plot from the MINT sPLS performed on the MAGs/WQ contrast, showing both global (above) and partial (below) components from the MINT sPLS model. Samples are projected into the space spanned by the first two components, and coloured/assigned symbols by their reef zoning status.", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+patchwork::wrap_plots(mint.spls2.WQ.MAGs.global.sample.plot.zoning.Steve$graph,
+                      mint.spls2.WQ.MAGs.partial.sample.plot.zoning.Steve$graph, nrow = 2)
+```
+
+```{r MINT sPLS MAGs-WQ Circle correlation plot with ind taxa Steve, fig.width = 7, fig.height=7, fig.cap="Correlation circle plot from the MINT sPLS2 performed on the MAGs/WQ contrast. The plot highlights correlations within selected Indicator MAGs and how they correlate to water chemistry metrics on the first two dimensions of sPLS2, and across the four sampling trips. This plot should be interpreted jointly with the sample plot above to better understand how the enrichment levels of these microbes may characterise specific sample groups. Overall, on dimension 1 sites separately cluster based on the ratio of particulate/dissolved organic matter.", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# Taxonomy for the 60 taxa
+MAGs.name.short.Steve.60 <- left_join(otu_table(pMAGs_95ANI_phyloseq_clr) %>%
+                              as.data.frame %>%
+                              rownames_to_column("OTU"),
+                            tax_table(pMAGs_95ANI_phyloseq_clr) %>%
+                              as.data.frame %>%
+                              rownames_to_column("OTU")) %>%
+  unite(taxonomy, c(Class, Order, Family, Genus, Species), sep = "; ") # Adding Taxonomy info
+# Taking only the 60 names now
+MAGs.name.short.Steve.60 <- left_join(list.MAGs.Steve,
+                                      MAGs.name.short.Steve.60)
+MAGs.name.short.Steve.60 <- as.character(MAGs.name.short.Steve.60$taxonomy)
+# Circle plot
+plotVar(mint.spls2.WQ.MAGs.Steve,
+        var.names = list(X.label = MAGs.name.short.Steve.60,
+                         Y.label = TRUE),
+        cex = c(3,4))
+```
+
+```{r MINT sPLS MAGs-WQ on global dataset, fig.width = 12, fig.height=14, fig.cap="MINT sPLS - MAGs MetaPhlAn/WQ. Microbial taxa that were identified as indicators are shown on the y axis, while WQ measurements are shown on the x axis. These molecular signatures are shared across the four sampling transects. The scale shows similarity values (partial correlations) between the X and Y variables selected across the first two sPLS dimensions, and clustered with a complete Euclidean distance method. The color indicates either positive (red) or negative (blue) correlation.", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+cim.mint.spls2.WQ.MAGs.Steve <- cim(mint.spls2.WQ.MAGs.Steve,
+    comp = 1:2,
+    xlab = "WQ parameters",
+    ylab = "Indicator MAGs",
+    cluster = "both",
+    margins = c(19, # bottom
+                35), # right
+    row.names = MAGs.name.short.Steve.60,
+    symkey = FALSE,
+    keysize = c(1, 0.4),
+    title = "MINT sPLS MAGs/WQ (60 MAGs)")
+```
+
+```{r Heatmap for rawgraphs MINT sPLS 60 MAGs only, fig.height=13, fig.width=30, fig.cap="Saving as R object for rawgraphs.", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, results='hide', fig.show='hide'}
+# Exporting for RawGraphs
+list.MAGs.Steve.ordered.heatmap.for.rawgraphs <- cim.mint.spls2.WQ.MAGs.Steve$mat %>% # This is the heatmap and how the 60 indicators are ordered
+  as.data.frame() %>% 
+  rownames_to_column("OTU") %>% 
+  left_join(., tax_table(pMAGs_95ANI_phyloseq_clr) %>% # I'm joining the taxonomy here
+                              as.data.frame %>%
+                              rownames_to_column("OTU")) %>% # now adding the Group conribution column from MINT sPLS-DA laoding plots
+  left_join(., 
+            loading.plots.for.Steve %>%
+              as.data.frame() %>%
+              dplyr::select("TO.GroupContrib") %>% 
+              rownames_to_column("OTU")
+            ) %>% # And finally, only choosing columns of interest
+  dplyr::select("OTU","Domain", "Phylum", "Class", "Order", "Family", "Genus", "Species", "TO.GroupContrib")
+
+# Exporting :)
+write.csv(list.MAGs.Steve.ordered.heatmap.for.rawgraphs, file = "/home/markoterzin/Desktop/Marko_for_DB_paper/MINT_sPLS_for_rawgraphs_60_MAGs_Steve.csv", row.names = F, quote = F)
+
+# But I will also want to link these with the loading plots, so merging the two docs!
+rawgraphs_link_loading_plots_heatmap <- left_join(list.MAGs.Steve,
+                                                  list.MAGs.Steve.ordered.heatmap.for.rawgraphs)
+write.csv(rawgraphs_link_loading_plots_heatmap, file = "/home/markoterzin/Desktop/Marko_for_DB_paper/linking_loading_plots_heatmap_60_MAGs_Steve.csv", row.names = F, quote = F)
+```
+
+```{r Genome size Steve 60, fig.height=14, fig.width=5}
+# Plotting as barplots!
+bp_genome_size_Steve_60 <- left_join(list.MAGs.Steve,
+                                     drep95_ANI_160_genome_size[,c(1,5,23)]) %>% # five is indicator colors, 23 is genome size
+  ggplot(aes(y=factor(OTU, level = unique(list.MAGs.Steve$OTU)),
+             x = Genome.size..bp..CheckM1,
+             fill = Trip_04_July_2020.GroupContrib)) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+    scale_fill_manual(values = c("seagreen3", # No-take zones
+                               "steelblue4")) + # Take zones
+  labs(y = 'Indicator MAGs',
+       x = "Genome size (bp)",
+       title = 'Genome size') +
+      theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 12), legend.position = "NONE") +
+    scale_y_discrete(limits=rev)
+bp_genome_size_Steve_60
+```
+
+```{r GC content Steve 60, fig.height=14, fig.width=5}
+# Taxonomy for the 60 taxa
+MAGs.name.short.Steve.60.bp <- left_join(otu_table(pMAGs_95ANI_phyloseq_clr) %>%
+                              as.data.frame %>%
+                              rownames_to_column("OTU"),
+                            tax_table(pMAGs_95ANI_phyloseq_clr) %>%
+                              as.data.frame %>%
+                              rownames_to_column("OTU")) %>%
+  unite(taxonomy, c(Class, Order, Family, Genus, Species), sep = "; ") %>%  # Adding Taxonomy info
+  dplyr::select(c("OTU", "taxonomy")) # Selecting only columns of interest
+# Only the 60 taxa now
+MAGs.name.short.Steve.60.bp <- left_join(list.MAGs.Steve,
+                                         MAGs.name.short.Steve.60.bp)
+
+# Plotting as barplots!
+bp_GC_Steve_60 <- left_join(list.MAGs.Steve, # I only want the 60 MAGs for Steve, with their taxonomy
+                                     drep95_ANI_160_genome_size[,c(1,5,33)]) %>% # five is indicator colors, 23 is genome size
+#  unite(OTU, c(OTU, taxonomy), sep = "; ") %>% # Trying to add taxonomy here but then the ordering deosn't work...
+  ggplot(aes(y=factor(OTU, level = unique(list.MAGs.Steve$OTU)), # ordering the same way as the MAGs are ordered in the loading plots
+             x = GC.CheckM1,
+             fill = Trip_04_July_2020.GroupContrib)) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+    scale_fill_manual(values = c("seagreen3", # No-take zones
+                               "steelblue4")) + # Take zones
+  labs(y = 'Indicator MAGs',
+       x = "GC content (%)",
+       title = 'GC content') +
+      theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 12), legend.position = "NONE")
+#    scale_y_discrete(limits=rev)
+bp_GC_Steve_60
+```
+
+
+```{r Genome size medians boxplots Steve, fig.height=4, fig.width=4, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, results='hide', fig.show='hide'}
+# Plotting
+boxplot_genome_size_Steve_60 <- left_join(list.MAGs.Steve,
+                              subset(drep95_ANI_160_genome_size[,c(1,5,23)], !is.na(Genome.size..bp..CheckM1))
+                              ) %>% 
+  subset(!is.na(Genome.size..bp..CheckM1)) %>% 
+  ggplot() +
+  geom_boxplot(aes(y = Genome.size..bp..CheckM1,
+                   x = Trip_04_July_2020.GroupContrib,
+                   fill = Trip_04_July_2020.GroupContrib),
+               show.legend = FALSE) + # just fill as in Trip 2
+#  facet_grid(~Sampling_trip) +
+  labs(title="Genome size median",
+       y="Genome size",
+       x="Reef Zoning Status") +
+  scale_fill_manual(values = c("seagreen3", # Closed
+                              "steelblue4") # Open
+                ) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 12), legend.position = "none") +
+  scale_y_continuous(limits = c(0, 4200000))
+boxplot_genome_size_Steve_60
+```
+
+```{r GC content medians boxplots Steve, fig.height=4, fig.width=4, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, results='hide', fig.show='hide'}
+# Plotting
+boxplot_GC_Steve_60 <- left_join(list.MAGs.Steve,
+                              subset(drep95_ANI_160_genome_size[,c(1,5,33)], !is.na(GC.CheckM1))
+                              ) %>%
+  subset(., !is.na(GC.CheckM1)) %>% 
+  ggplot() +
+  geom_boxplot(aes(y = GC.CheckM1,
+                   x = Trip_04_July_2020.GroupContrib,
+                   fill = Trip_04_July_2020.GroupContrib),
+               show.legend = FALSE) + # just fill as in Trip 2
+#  facet_grid(~Sampling_trip) +
+  labs(title="GC content median",
+       y="GC (%)",
+       x="Reef Zoning Status") +
+  scale_fill_manual(values = c("seagreen3", # Closed
+                              "steelblue4") # Open
+                ) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 12), legend.position = "none") +
+  scale_y_continuous(limits = c(0, 100))
+boxplot_GC_Steve_60
+```
+
+```{r GC content and genome size boxplots together Steve, fig.height=4, fig.width=6, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, results='hide', fig.show='hide'}
+patchwork::wrap_plots(boxplot_GC_Steve_60, boxplot_genome_size_Steve_60,
+                      ncol = 2,
+                      nrow = 1)
+```
+
+Steve was actually suggesting to re-do MINT sPLS on all the MAGs (876 MAGs and all WQ metrics) and then just pull out correlations for the 60 most influential as identified my MINT sPLS-DA (to discriminate between no-take and take reefs), so I'm doing that here
+
+```{r Heatmap from MINT sPLS on all data but only pulling out the 60, fig.width = 18, fig.height=14}
+mint.spls2.WQ.MAGs.for_Steve <- mint.spls(X = MAGs,
+                           Y = metadata_IMOS_MGD_MAGs[,c(88:103,105)], # Excluding column 104 as this is Turbidity
+                           ncomp = 2,
+                           study = sample_data(pMAGs_95ANI_phyloseq_clr)$Sampling_trip,
+                           keepX = c(550, 550), # Making sure that those 60 indicator MAGs will be there!
+                           mode = "regression")
+heatmap_for_Steve_60 <- cim(mint.spls2.WQ.MAGs.for_Steve,
+    comp = 1:2,
+    xlab = "WQ parameters",
+    ylab = "Indicator MAGs",
+    margins = c(19, # bottom
+                33), # right
+    row.names = MAGs.name.short,
+    symkey = FALSE,
+    keysize = c(1, 0.4),
+    title = "MINT sPLS MAGs/WQ (PCs 1 and 2)")
+heatmap_for_Steve_60 <- heatmap_for_Steve_60$mat %>% 
+  as.data.frame() %>% 
+  rownames_to_column("OTU")
+# Now only selecting the 60 MAGs of interest
+heatmap_for_Steve_60 <- left_join(list.MAGs.Steve, heatmap_for_Steve_60)
+
+# Before I plot the heatmap, I also want to add an annotation_row where phyla will be colored 
+# Get unique values from the Phylum column
+phyla <- tax_table(pMAGs_95ANI_phyloseq_clr)[, "Phylum"]
+
+heatmap_for_Steve_60 <- left_join(heatmap_for_Steve_60,
+                                  phyla %>% 
+                                    as.data.frame() %>% 
+                                    rownames_to_column("OTU"))
+
+# Just extracting our unique phyla
+unique_phyla <- unique(phyla %>% 
+                         as.data.frame() %>% 
+                         rownames_to_column("MAG_ID") %>% 
+                         dplyr::select("Phylum"))
+# Print the unique values
+print(unique_phyla)
+
+# OK, now assigning color to each of the 23 unique phyla
+phylum_colors <- c(
+  "p__Pseudomonadota"       = "skyblue2",
+  "p__Thermoplasmatota"     = "lightgoldenrod1",
+  "p__Myxococcota"          = "plum2",
+  "p__Bacteroidota"         = "salmon1",
+  "p__Verrucomicrobiota"    = "tan1",
+  "p__Desulfobacterota_D"   = "rosybrown4",
+  "p__Margulisbacteria"     = "skyblue1",
+  "p__Cyanobacteriota"      = "darkseagreen3",
+  "p__Actinomycetota"       = "slateblue4",
+  "p__Chloroflexota"        = "slateblue3",
+  "p__Planctomycetota"      = "mediumpurple1",
+  "p__Bdellovibrionota"     = "lightblue",
+  "p__Dependentiae"         = "khaki",
+  "p__Asgardarchaeota"      = "violetred1",
+  "p__Marinisomatota"       = "tomato2",
+  "p__Patescibacteria"      = "lavenderblush3",
+  "p__SAR324"               = "indianred",
+  "p__Thermoproteota"       = "navajowhite2",
+  "p__UBP17"                = "tomato1",
+  "p__Bacillota"            = "rosybrown",
+  "p__Latescibacterota"     = "wheat1",
+  "p__Nanoarchaeota"        = "palegoldenrod",
+  "p__Chlamydiota"          = "olivedrab"
+)
+
+# Add the color column to the dataframe
+heatmap_for_Steve_60 <- heatmap_for_Steve_60 %>%
+  mutate(Color = phylum_colors[Phylum])
+
+# Lastly, adding back the taxonomy info
+heatmap_for_Steve_60 <- left_join(heatmap_for_Steve_60, MAGs.name.short.Steve.60.bp) %>% 
+  unite(OTU, c(OTU, taxonomy), sep = "; ")
+
+# Define a custom color palette
+color_palette <- colorRampPalette(c("steelblue4", "white", "indianred4"))(100)
+
+# Prepare your data
+heatmap_data <- heatmap_for_Steve_60[, 1:18] %>% column_to_rownames("OTU")
+
+# Create a data frame for row annotations
+row_annotation <- data.frame(
+  Phylum = heatmap_for_Steve_60$Phylum
+#  Color = heatmap_for_Steve_60$Color
+)
+
+# Ensure that row names of row_annotation match row names of heatmap_data
+rownames(row_annotation) <- rownames(heatmap_data)
+
+# Create the heatmap
+pheatmap(heatmap_data,
+         color = color_palette,
+         show_rownames = TRUE,
+         cluster_rows = TRUE,
+         cluster_cols = TRUE,
+         annotation_row = row_annotation,
+         display_numbers = FALSE)
+```
+
+# Saving the R object (for downstream analysis)
+
+```{r Save an R object, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+save.image(file = "/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/cleaned_code/Figure_3/Figure_3.RData")
+```
+
+The final map (Fig. 3) was created in Inkscape.
