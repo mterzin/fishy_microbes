@@ -24,6 +24,16 @@
 
 This study investigates the relationship between seawater microbiomes, environmental variables, and reef protection status (No-Take Marine Reserves vs. fished reefs) across the Great Barrier Reef (GBR). We integrated 876 prokaryotic metagenome-assembled genomes (pMAGs), physico-chemical water data, benthic cover, and fish survey data to identify microbial indicators of reef zoning and predict environmental conditions from microbial community composition.
 
+## Conceptual model
+
+The conceptual framework proposed in this study linking reef protection status,
+fish biomass, benthic cover, nutrient dynamics, and seawater microbial
+community structure.
+
+<p align="center">
+  <img src="figures/Figure_7.png" width="900">
+</p>
+
 **Key finding:** NTMRs harbor distinct seawater microbiomes characterized by oligotrophic taxa (*Pelagibacterales*, SAR86, *Marinismatales*), while fished reefs are enriched in copiotrophic taxa (*Flavobacteriales*, UA16). These microbial signatures predict zoning with ~71% accuracy across 7 GBR sectors.
 
 ---
