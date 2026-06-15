@@ -34,21 +34,6 @@ community structure.
   <img src="figures/Figure_7.png" width="900">
 </p>
 
-🐟 Fish surveys      🪸 Benthic cover      🧪 Water chemistry
-          \               |               /
-           \              |              /
-            → 🌊 Seawater metagenomes ←
-                        |
-               🧬 Nanopore + Illumina
-                        |
-                📦 5,283 recovered pMAGs
-                        |
-              🗄️ GBR Microbial Database
-                        |
-             🤖 Machine learning analyses
-                        |
-      🪸 Reef zoning & environmental prediction
-
 **Key finding:** NTMRs harbor distinct seawater microbiomes characterized by oligotrophic taxa (*Pelagibacterales*, SAR86, *Marinismatales*), while fished reefs are enriched in copiotrophic taxa (*Flavobacteriales*, UA16). These microbial signatures predict zoning with ~71% accuracy across 7 GBR sectors.
 
 ---
