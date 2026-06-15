@@ -122,15 +122,23 @@ A custom-made Python script implements co-occurrence network analysis to compare
 **4. Visualization:**
 - Boxplots comparing modularity distributions between protection statuses with sector-specific shapes and trip colors
 
-### Figure 5: Environmental Predictions (`Figure_5.Rmd`)
-- **GLMMs**: Testing environmental differences (glmmTMB v1.1.10, DHARMa v0.4.7)
-- **Random Forest regression**: Predicting continuous variables from microbial data
-- High accuracy predictions: temperature (R² = 0.74), salinity (R² = 0.69), particulate nutrients (R² = 0.66-0.74)
+### Figure 5: Differential Metabolic Potential of Indicator pMAGs (`Figure_5.Rmd`)
+- **KEGG module completeness**: Comparing completeness scores of 358 KEGG modules between fished reef-enriched and NTMR-enriched indicator pMAGs
+- **Top 45 modules**: Heatmap of modules with greatest between-group differences, grouped by metabolic category (carbohydrate metabolism, energy generation, biosynthesis of cofactors, vitamins, amino acids, and lipids)
+- **Statistical testing**: Wilcoxon rank-sum tests comparing mean 
 
-### Figure 6: Microbial Niche Analysis (`Figure_6.Rmd`)
-- **Niche inference**: Robust optimum (RO) method (Chaffron et al. 2021)
-- Niche bounds: Q1 (lower bound), Q2 (optimum), Q3 (upper bound)
-- Specialist vs. generalist taxa identification
+### Figure 6: Environmental Predictions & Microbial Niche Analysis (`Figure_6.Rmd`)
+
+**1. Random Forest environmental prediction:**
+- **Model performance**: RF models predicting continuous environmental variables, evaluated across 50 stratified permutation tests per variable (80/20 train/test split stratified by GBR sector)
+- **High accuracy predictions** (R² > 0.6): seawater temperature (R² = 0.74), salinity, particulate nutrients (POC R² = 0.74, PN R² = 0.66), and dissolved inorganic phosphorus (PO₄³⁻ R² = 0.69, TDP R² = 0.79)
+- **Low-to-moderate accuracy** (R² < 0.6): dissolved nitrogen species, silicate, benthic cover variables, and most fish groups (exception: corallivore fish biomass, median R² = 0.72)
+
+**2. Microbial niche inference:**
+- **Niche modeling**: Robust optimum (RO) method (Chaffron et al. 2021) applied to top 50 RF predictors per environmental variable
+- **Niche bounds**: Q1 (lower bound), Q2 (optimum), Q3 (upper bound)
+- **Specialist vs. generalist taxa**: Narrow niche ranges associated with high RF prediction accuracy; broad niches associated with weaker predictive power
+- **Example**: Top 50 temperature predictors show narrow thermal niche (Q1–Q3: 27.38 ± 2.11°C to 28.38 ± 1.73°C; optimum Q2: 27.84 ± 1.88°C), predominantly *Flavobacteriales* (46%)
 
 ---
 
