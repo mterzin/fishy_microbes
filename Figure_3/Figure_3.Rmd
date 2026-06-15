@@ -239,7 +239,7 @@ mint.spls2.fish.MAGs.global.sample.plot.sectors <- plotIndiv(mint.spls2.fish.MAG
           ellipse = T,
           rep.space = "XY-variate",
 #          ind.names = sample_names(pMAGs_95ANI_phyloseq_clr),
-          col.per.group = c("seagreen3", # Closed to fishing
+          col = c("seagreen3", # Closed to fishing
                             "steelblue4"), # Open to fishing
           legend.title = 'Reef Management Status')
 ```
@@ -548,7 +548,7 @@ mint.spls2.fish.MAGs.partial.sample.plot.sector <- plotIndiv(mint.spls2.fish.MAG
           ind.names = sample_names(pMAGs_95ANI_phyloseq_clr),
           study = "all.partial",
           rep.space = "XY-variate",
-          col.per.group = c("seagreen3", # Closed to fishing
+          col = c("seagreen3", # Closed to fishing
                             "steelblue4"), # Open to fishing
           legend.title = 'Reef Management Status')
 ```
@@ -939,7 +939,7 @@ mint.spls2.WQ.MAGs.global.sample.plot.trip <- plotIndiv(mint.spls2.WQ.MAGs,
           legend = T,
           rep.space = "XY-variate",
           ind.names = sample_names(pMAGs_95ANI_phyloseq_clr),
-          col.per.group =c("indianred", # Sampling trip 1
+          col =c("indianred", # Sampling trip 1
                 "indianred4", # Sampling trip 2 
                 "red3", # Sampling trip 3
                 "slateblue"), # Sampling trip 4
@@ -953,7 +953,7 @@ mint.spls2.WQ.MAGs.global.sample.plot.zoning <- plotIndiv(mint.spls2.WQ.MAGs,
           legend = T,
           rep.space = "XY-variate",
           ind.names = sample_names(pMAGs_95ANI_phyloseq_clr),
-          col.per.group = c("seagreen3", # Closed to fishing
+          col = c("seagreen3", # Closed to fishing
                             "steelblue4"), # open to fishing
           legend.title = 'Reef Zoning')
 ```
@@ -966,7 +966,7 @@ mint.spls2.WQ.MAGs.partial.sample.plot.trips <- plotIndiv(mint.spls2.WQ.MAGs,
           ind.names = sample_names(pMAGs_95ANI_phyloseq_clr),
           study = "all.partial",
           rep.space = "XY-variate",
-          col.per.group =c("indianred", # Sampling trip 1
+          col =c("indianred", # Sampling trip 1
                 "indianred4", # Sampling trip 2 
                 "red3", # Sampling trip 3
                 "slateblue"), # Sampling trip 4
@@ -981,7 +981,7 @@ mint.spls2.WQ.MAGs.partial.sample.plot.zoning <- plotIndiv(mint.spls2.WQ.MAGs,
           ind.names = sample_names(pMAGs_95ANI_phyloseq_clr),
           study = "all.partial",
           rep.space = "XY-variate",
-          col.per.group = c("seagreen3", # Closed to fishing
+          col = c("seagreen3", # Closed to fishing
                             "steelblue4"), # open to fishing
           legend.title = 'Reef Zoning')
 ```
