@@ -186,12 +186,12 @@ A custom-made Python script implements co-occurrence network analysis to compare
 ## Key R Packages and Versions
 | Package | Version | Citation | Purpose |
 |---------|---------|----------|---------|
-| mixOmics | 6.26.0 | Rohart et al. 2017 | MINT sPLS-DA, MINT sPLS |
+| mixOmics | 6.26.0 | Rohart et al. 2017 | PCA, (s)PLS-DA, MINT (s)PLS-DA, MINT (s)PLS |
 | vegan | 2.6-4 | Oksanen et al. 2022 | PERMANOVA, dbRDA |
 | randomForest | 4.7-1.1 | Liaw & Wiener 2002 | Random Forest classification/regression |
 | ALDEx2 | 1.34.0 | Fernandes et al. 2013 | Differential abundance testing |
-| glmmTMB | 1.1.10 | Brooks et al. 2017 | GLMMs for environmental variables |
-| DHARMa | 0.4.7 | Hartig 2022 | GLMM residual diagnostics |
+| glmmTMB | 1.1.10 | Brooks et al. 2017 | GLMMs for LTMP variables |
+| DHARMa | 0.4.7 | Hartig 2022 | GLMM residual diagnostics for LTMP variables |
 | phyloseq | 1.46.0 | McMurdie & Holmes 2013 | Microbiome data handling |
 | microbiome | 1.24.0 | Lahti & Shetty 2017 | CLR transformation |
 | igraph | 1.5.1 | Csárdi & Nepusz 2006 | Network analysis, modularity |
@@ -220,7 +220,7 @@ A custom-made Python script implements co-occurrence network analysis to compare
 | Python | 3.12 | Python Core Team | Modularity analysis scripting |
 | networkx | 3.6.1 | Hagberg et al. 2008 | Python network analysis (alternative) |
 | scipy | 1.12.0 | Virtanen et al. 2020 | Statistical tests in Python |
-| DIAMOND | 2.0.9 | Buchfink et al. 2015 | Read-based validation |
+| DIAMOND | 2.0.9 | Buchfink et al. 2015 | Mapping the reads against NCBI nr |
 | MEGAN | 6.23.0 | Huson et al. 2016 | Taxonomic profiling |
 | Inkscape | 0.92.5 | Inkscape Project | Figure compilation |
 Full session details available in `sessionInfo.txt`.
@@ -240,6 +240,7 @@ pip install networkx pandas numpy scipy matplotlib
 ## License
 This code is released under the **MIT License** (approved by the Open Source Initiative). The full license text is included in the repository (`LICENSE`), and the code may be reused and adapted on the user's own data.
 ---
+
 ## Citation
 If you use this code or data, please cite:
 > Terzin, M., Robbins, S. J., Lê Cao, K.-A., et al. No-take marine reserves promote oligotrophic reef bacterioplankton communities across the Great Barrier Reef. *Nature Communications* (under revision).
