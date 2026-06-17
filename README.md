@@ -16,20 +16,18 @@
 <sup>8</sup>Institute for Marine and Antarctic Studies, University of Tasmania, TAS, 7001  
 <sup>*</sup>Corresponding authors
 
-**Status:** Under consideration at *Nature Communications*
+**Status:** Under revision at *Nature Communications*
 ---
 
 ## Project Overview
 This study investigates the relationship between seawater microbiomes, environmental variables, and reef protection status (No-Take Marine Reserves vs. fished reefs) across the Great Barrier Reef (GBR). We integrated 876 prokaryotic metagenome-assembled genomes (pMAGs), physico-chemical water data, benthic cover, and fish survey data to identify microbial indicators of reef zoning and predict environmental conditions from microbial community composition.
 
 ## Conceptual model
-The conceptual framework proposed in this study linking reef protection status,
-fish biomass, benthic cover, nutrient dynamics, and seawater microbial
-community structure.
+The conceptual framework proposed in this study linking reef protection status, fish biomass, benthic cover, nutrient dynamics, and seawater microbial community structure.
+
 <p align="center">
   <img src="figures/Figure_7.png" width="900">
 </p>
-
 **Key finding:** NTMRs harbor distinct seawater microbiomes characterized by oligotrophic taxa (*Pelagibacterales*, SAR86, *Marinismatales*), while fished reefs are enriched in copiotrophic taxa (*Flavobacteriales*, UA16). These microbial signatures predict zoning with ~71% accuracy across 7 GBR sectors.
 ---
 
@@ -47,6 +45,7 @@ See the [Key R Packages and Versions](#key-r-packages-and-versions) and [Externa
 ## Installation Guide
 
 ### 1. Clone the repository
+
 ```bash
 git clone https://github.com/mterzin/fishy_microbes.git
 cd fishy_microbes
@@ -54,6 +53,7 @@ cd fishy_microbes
 
 ### 2. Install R dependencies
 R packages install from CRAN and Bioconductor using the standard installers:
+
 ```r
 install.packages(c("vegan", "randomForest", "tidyverse", "ggplot2",
                    "patchwork", "igraph", "glmmTMB", "DHARMa"))
@@ -63,6 +63,7 @@ BiocManager::install(c("mixOmics", "ALDEx2", "phyloseq", "microbiome"))
 ```
 
 ### 3. Install the Python environment for the modularity analysis
+
 ```bash
 # Create conda environment (optional)
 conda create -n modularity_env python=3.12
@@ -94,6 +95,7 @@ rmarkdown::render("Figure_2_Nature_Communications.Rmd")
 Each script maps directly to a manuscript figure and the analyses described in the Materials and Methods (see [Analysis Workflow](#analysis-workflow) below). The code is released under the MIT License, permitting reuse and adaptation on the user's own data.
 
 ---
+
 ## Data Availability
 | Data type | Repository | Accession/Link |
 |-----------|------------|----------------|
@@ -103,32 +105,38 @@ Each script maps directly to a manuscript figure and the analyses described in t
 | Physico-chemical variables | IMOS-AODN | [10.25845/Q4XH-YN10](https://doi.org/10.25845/Q4XH-YN10) |
 | Benthic cover & fish data | AIMS LTMP | [AIMS Data Portal](https://apps.aims.gov.au/metadata/view/a17249ab-5316-4396-bb27-29f2d568f727) |
 | Assembly & binning code | *bioRxiv* | [Robbins et al. 2025](https://www.biorxiv.org/content/10.1101/2025.05.13.653689v1) |
+
 ## Metagenomic Processing
 Metagenomes were assembled using the **Aviary v0.3.3** pipeline, which generated:
 - **Hybrid assemblies** (Illumina + Nanopore) for 27 sites
 - **Short-read-only assemblies** for 21 sites
+
 ### Assembly & Binning
 - **Long-read processing**: Guppy v5.0.16 (superaccuracy basecalling), Porechop (adapter/barcode trimming)
 - **Assembly**: Aviary v0.3.3 with metaFlye (long-read assembly), racon and pilon (polishing), and metaSPAdes (short-read assembly)
 - **Binning**: MetaBAT1, MetaBAT2, MaxBin2, CONCOCT, VAMB, and Rosella
 - **Refinement**: DAS Tool v1.1.2
 - **Quality assessment**: CheckM v1.2.2 and CheckM2 v1.0.2 (pMAGs retained at a quality threshold of ≥50, calculated as completeness − 3×contamination)
+
 ### Dereplication & Abundance
 - **Dereplication**: CoverM v0.6 at 95% Average Nucleotide Identity (ANI)
 - **Result**: 5,283 pMAGs → 876 "species-resolved" pMAGs<sub>95%ANI</sub>
 - **Read mapping**: minimap2 v2.18 (via CoverM) for abundance estimation
+
 ### Taxonomic & Functional Annotation
 - **Taxonomy**: Genome Taxonomy Database Toolkit (GTDB-Tk, release R214)
 - **Functional annotation**: anvi'o v8 (with Prodigal v2.6.3 and HMMER v3.3.2) with KEGG Orthology (KO) database
 - **Metabolic pathways**: KEGG module completeness (358 modules detected)
 
 Full metagenomic processing methods (assembly, binning, taxonomy, abundance) are described in Robbins et al. 2025.
+
 ---
 ## Analysis Workflow
 ### Figure 1: Study Site Map (`Figure_1.Rmd`)
 - Map of 48 offshore reefs across 7 GBR sectors
 - Sampling timeline: 4 transects (Nov 2019 – Jul 2020) and 7 sectors
 - Reef protection status and GBR zoning categories
+
 ### Figure 2: Microbial Indicators of Reef Protection (`Figure_2_Nature_Communications.Rmd`)
 This script implements a comprehensive analytical framework to identify and validate microbial indicators of reef protection status:
 **1. Community-level assessment:**
@@ -145,9 +153,11 @@ This script implements a comprehensive analytical framework to identify and vali
 **4. Validation of indicator robustness:**
 - **Presence/absence analysis**: Detection frequency quantification for indicator MAGs across 190 samples using raw count data to assess whether abundance differences reflect genuine ecological variation versus genome size bias
 - **Read-based validation**: Assembly-independent verification using DIAMOND (v2.0.9) mapping against NCBI nr database, MEGAN (v6.23.0) taxonomic profiling, and MINT sPLS-DA on read-based profiles to confirm indicator selection across independent methods
+
 ### Figure 3: Microbial-Environment Correlations (`Figure_3.Rmd`)
 - **MINT sPLS**: Integrating 876 MAGs with 54 environmental variables
 - Biplots and clustered image maps (CIM)
+
 ### Figure 4: Microbial Network Analysis (`Figure_4.Rmd`)
 - **Co-occurrence networks**: Connectedness and cohesion metrics (Herren & McMahon 2017)
 - **Network comparison**: NTMR vs. fished reef networks (connectedness and cohesion)
@@ -160,17 +170,19 @@ A custom-made Python script implements co-occurrence network analysis to compare
 - **Edge filtering**: Only positive partial correlations (weight > 0) were retained, consistent with the predominance of positive associations in global plankton interactomes (98.5% positive edges; Chaffron et al., 2021)<sup>83</sup>
 **2. Modularity analysis:**
 - **Binary network conversion**: Positive correlation networks were converted to binary (unweighted) graphs by retaining edges with weight > 0
-- **Modularity calculation**: Computed using the Clauset-Newman-Moore greedy algorithm<sup>87</sup> as implemented in the `cluster_fast_greedy` function from `igraph` v1.5.1<sup>88</sup>
+- **Modularity calculation**: Computed using the Clauset-Newman-Moore greedy algorithm<sup>87</sup> as implemented in the `greedy_modularity_communities` function from `NetworkX` v3.6.1<sup>88</sup>
 - **Community detection**: Modularity measures the degree of network compartmentalization, where higher values indicate more compartmentalised community structure
 **3. Statistical comparison:**
 - **Between-zone comparison**: Mann-Whitney U tests comparing modularity values between NTMR (n = 7) and fished (n = 7) sector-specific networks
 - **Effect size**: Cohen's d calculated to quantify magnitude of differences
 **4. Visualization:**
 - Boxplots comparing modularity distributions between protection statuses with sector-specific shapes and trip colors
+
 ### Figure 5: Differential Metabolic Potential of Indicator pMAGs (`Figure_5.Rmd`)
 - **KEGG module completeness**: Comparing completeness scores of 358 KEGG modules between fished reef-enriched and NTMR-enriched indicator pMAGs
 - **Top 45 modules**: Heatmap of modules with greatest between-group differences, grouped by metabolic category (carbohydrate metabolism, energy generation, biosynthesis of cofactors, vitamins, amino acids, and lipids)
 - **Statistical testing**: Wilcoxon rank-sum tests comparing mean completeness scores between groups
+
 ### Figure 6: Environmental Predictions & Microbial Niche Analysis (`Figure_6.Rmd`)
 **1. Random Forest environmental prediction:**
 - **Model performance**: RF models predicting continuous environmental variables, evaluated across 50 stratified permutation tests per variable (80/20 train/test split stratified by GBR sector)
@@ -186,15 +198,15 @@ A custom-made Python script implements co-occurrence network analysis to compare
 ## Key R Packages and Versions
 | Package | Version | Citation | Purpose |
 |---------|---------|----------|---------|
-| mixOmics | 6.26.0 | Rohart et al. 2017 | PCA, (s)PLS-DA, MINT (s)PLS-DA, MINT (s)PLS |
+| mixOmics | 6.26.0 | Rohart et al. 2017 | MINT sPLS-DA, MINT sPLS |
 | vegan | 2.6-4 | Oksanen et al. 2022 | PERMANOVA, dbRDA |
 | randomForest | 4.7-1.1 | Liaw & Wiener 2002 | Random Forest classification/regression |
 | ALDEx2 | 1.34.0 | Fernandes et al. 2013 | Differential abundance testing |
-| glmmTMB | 1.1.10 | Brooks et al. 2017 | GLMMs for LTMP variables |
-| DHARMa | 0.4.7 | Hartig 2022 | GLMM residual diagnostics for LTMP variables |
+| glmmTMB | 1.1.10 | Brooks et al. 2017 | GLMMs for environmental variables |
+| DHARMa | 0.4.7 | Hartig 2022 | GLMM residual diagnostics |
 | phyloseq | 1.46.0 | McMurdie & Holmes 2013 | Microbiome data handling |
 | microbiome | 1.24.0 | Lahti & Shetty 2017 | CLR transformation |
-| igraph | 1.5.1 | Csárdi & Nepusz 2006 | Network analysis, modularity |
+| igraph | 1.5.1 | Csárdi & Nepusz 2006 | Network analysis (graph handling) |
 | tidyverse | 2.0.0 | Wickham et al. 2019 | Data wrangling & visualization |
 | ggplot2 | 3.5.1 | Wickham 2016 | Publication-quality graphics |
 | patchwork | 1.2.0 | Pedersen 2024 | Plot composition |
@@ -218,14 +230,16 @@ A custom-made Python script implements co-occurrence network analysis to compare
 | anvi'o | 8 | Eren et al. 2015 | Functional annotation (KEGG Orthology) |
 | FlashWeave | 0.19.2 | Tackmann et al. 2019 | Co-occurrence network inference |
 | Python | 3.12 | Python Core Team | Modularity analysis scripting |
-| networkx | 3.6.1 | Hagberg et al. 2008 | Python network analysis (alternative) |
+| networkx | 3.6.1 | Hagberg et al. 2008 | Co-occurrence network analysis & modularity (Clauset-Newman-Moore) |
 | scipy | 1.12.0 | Virtanen et al. 2020 | Statistical tests in Python |
-| DIAMOND | 2.0.9 | Buchfink et al. 2015 | Mapping the reads against NCBI nr |
+| DIAMOND | 2.0.9 | Buchfink et al. 2015 | Read-based validation |
 | MEGAN | 6.23.0 | Huson et al. 2016 | Taxonomic profiling |
 | Inkscape | 0.92.5 | Inkscape Project | Figure compilation |
+
 Full session details available in `sessionInfo.txt`.
 
 ## Python Environment for Modularity Analysis
+
 The modularity analysis requires a Python environment with the following dependencies:
 
 ```bash
@@ -235,9 +249,10 @@ conda activate modularity_env
 # Install required packages
 pip install networkx pandas numpy scipy matplotlib
 ```
-
 ---
+
 ## License
+
 This code is released under the **MIT License** (approved by the Open Source Initiative). The full license text is included in the repository (`LICENSE`), and the code may be reused and adapted on the user's own data.
 ---
 
