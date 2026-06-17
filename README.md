@@ -5,6 +5,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 **Authors:** Marko Terzin<sup>1,2,3,5*</sup>, Steven J. Robbins<sup>4</sup>, Kim-Anh Lê Cao<sup>5</sup>, Sara C. Bell<sup>1</sup>, Katherine E. Dougan<sup>4</sup>, Julian Zaugg<sup>4</sup>, Renee K. Gruber<sup>1</sup>, Michael J. Emslie<sup>1</sup>, Daniela M. Ceccarelli<sup>1</sup>, Samuel Chaffron<sup>6,7</sup>, Philip Hugenholtz<sup>4</sup>, Nicole S. Webster<sup>1,4,8</sup>, David G. Bourne<sup>1,2,3</sup>, Yun Kit Yeoh<sup>1,3</sup>, Patrick W. Laffy<sup>1,3,*</sup>
+
 <sup>1</sup>Australian Institute of Marine Science, PMB no3 Townsville MC, Townsville QLD 4810  
 <sup>2</sup>College of Science and Engineering, James Cook University, Townsville, 4811  
 <sup>3</sup>AIMS@JCU, James Cook University, Townsville QLD 4811  
