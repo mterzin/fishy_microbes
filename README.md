@@ -29,8 +29,10 @@ community structure.
 <p align="center">
   <img src="figures/Figure_7.png" width="900">
 </p>
+
 **Key finding:** NTMRs harbor distinct seawater microbiomes characterized by oligotrophic taxa (*Pelagibacterales*, SAR86, *Marinismatales*), while fished reefs are enriched in copiotrophic taxa (*Flavobacteriales*, UA16). These microbial signatures predict zoning with ~71% accuracy across 7 GBR sectors.
 ---
+
 ## System Requirements
 
 ### Software dependencies
