@@ -1053,6 +1053,49 @@ cim(mint.spls2.WQ.MAGs,
 )
 ```
 
+```{r Exporting the raw data for plotting Fig 3A and 3B for the Source Data file}
+library(writexl); library(dplyr); library(tibble)
+
+out_dir <- "/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/cleaned_code/Source_Data_file_Nature_Communications/Figure_3"
+dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+
+## ---- Panel A: MINT sPLS biplot (3 data layers) ----
+panelA_samples <- plot_data %>%
+  rownames_to_column("Sample_ID") %>% 
+  dplyr::rename(Component_1 = Comp1, Component_2 = Comp2,
+                Reef_name = Reef, Zoning_status = Status, GBR_sector = Study)
+
+panelA_centroids <- reef_data %>%
+  dplyr::rename(Component_1 = Comp1, Component_2 = Comp2,
+                Reef_name = Reef, Zoning_status = Status)
+
+panelA_env_vectors <- as.data.frame(cors.Y) %>%
+  rownames_to_column("Environmental_variable")
+colnames(panelA_env_vectors)[2:3] <- c("Arrow_Component_1", "Arrow_Component_2")
+
+## ---- Panel B: partial correlations for the 350 MINT sPLS-DA indicators (as plotted) ----
+panelB <- ordered_heatmap_data %>%
+  rownames_to_column("Indicator_pMAG")
+
+## ---- Write workbook ----
+write_xlsx(
+  list(
+    "Fig 3A samples"    = panelA_samples,
+    "Fig 3A centroids"  = panelA_centroids,
+    "Fig 3A env arrows" = panelA_env_vectors,
+    "Fig 3B"            = panelB
+  ),
+  path = file.path(out_dir, "Figure_3_Source_Data.xlsx")
+)
+
+cat("Panel A samples:", nrow(panelA_samples), "\n")
+cat("Panel A centroids:", nrow(panelA_centroids), "\n")
+cat("Panel A env vectors:", nrow(panelA_env_vectors), "\n")
+cat("Panel B dims (indicators x env vars):", paste(dim(panelB), collapse = " x "), "\n")
+cat("Written:", file.path(out_dir, "Figure_3_Source_Data.xlsx"), "\n")
+```
+
+
 # Saving the R object (for downstream analysis)
 
 ```{r Save an R object, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
