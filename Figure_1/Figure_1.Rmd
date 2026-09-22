@@ -1077,6 +1077,43 @@ ggsave(
 )
 ```
 
+```{r Exporting for the source data file}
+library(writexl)
+
+# Drop the sf geometry so we can write a plain table, keep the lat/lon columns
+fig1_source <- map_coords %>%
+  st_drop_geometry() %>%
+  dplyr::select(
+    Reef_name        = name,
+    Longitude        = lon,
+    Latitude         = lat,
+    GBR_sector       = SECTOR,
+    Sampling_trip    = Sampling_trip,
+    Zoning_status    = Open_or_Closed_to_fishing
+  ) %>%
+  # make zoning human-readable
+  mutate(Zoning_status = dplyr::recode(Zoning_status,
+                                       "C" = "No-Take Marine Reserve (NTMR)",
+                                       "O" = "Fished")) %>%
+  arrange(GBR_sector, Reef_name)
+
+# Sanity check
+cat("Reefs in Figure 1 source data:", nrow(fig1_source), "\n")
+print(head(fig1_source))
+
+# Write out as a single-sheet xlsx named "Figure 1"
+out_dir  <- "/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/cleaned_code/Source_Data_file_Nature_Communications/Figure_1"
+dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+
+writexl::write_xlsx(
+  list("Figure 1" = fig1_source),
+  path = file.path(out_dir, "Figure_1_Source_Data.xlsx")
+)
+
+cat("Written to:", file.path(out_dir, "Figure_1_Source_Data.xlsx"), "\n")
+```
+
+
 # Saving the R object (for downstream analysis)
 
 ```{r Save an R object, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
