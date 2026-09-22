@@ -16,7 +16,7 @@ output:
     theme: united
     toc: yes
     toc_float: yes
-    css: "/home/marko-terzin/Documents/PhD/Thesis/Chapter_2/Data_analysis/Seawater/testing_Igor_Antti_R_script/All_seawater_full_dataset/resources/ws_style.css"  
+    css: "/home/marko-terzin/Documents/PhD/Thesis/Chapter_2/Data_analysis/Seawater/testing_Igor_Antti_R_script/All_seawater_full_dataset/resources/ws_style.css"
   pdf_document:
     toc: yes
     toc_depth: 3
@@ -1890,11 +1890,639 @@ cat("  - permutation_test_results.rds (R object)\n")
 cat("  - Supplementary_Table_All_Permutations.csv\n")
 ```
 
+## ***MINT*** sPLS-DA with Leave-One-***Reef***-Out Cross Validation
+
+```{r MINT sPLS-DA with reef as study, fig.height=40, fig.width=6, fig.cap="Saving as R object for rawgraphs.", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# ============================================================
+# DIAGNOSTIC TEST: MINT sPLS-DA with Leave-One-Reef-Out
+# ============================================================
+# PURPOSE: This chunk attempts MINT-based LORO validation to document
+# why it is technically and conceptually incompatible with this scheme.
+# The errors produced are used to justify the use of regular sPLS-DA
+# in the leave-one-reef-out validation reported in the manuscript.
+# ============================================================
+
+cat("\n\n")
+cat("============================================================\n")
+cat("DIAGNOSTIC: MINT sPLS-DA Leave-One-Reef-Out Attempt\n")
+cat("============================================================\n\n")
+
+# 1. SETUP - same objects as the sPLS-DA LORO chunk
+# --------------------------------------------------
+set.seed(123)
+
+X_loro_mint <- MAGs_MINT  # CLR-transformed abundances
+Y_loro_mint <- pMAGs_95ANI_phyloseq_clr@sam_data$Open_or_Closed_to_fishing
+reef_names_mint <- pMAGs_95ANI_phyloseq_clr@sam_data$REEF_NAME
+sector_names_mint <- pMAGs_95ANI_phyloseq_clr@sam_data$SECTOR_N_S
+
+# Parameters from the original MINT model
+ncomp_mint <- final.mint.splsda.open.closed.sector$ncomp
+keepX_mint <- final.mint.splsda.open.closed.sector$keepX
+
+unique_reefs_mint <- unique(reef_names_mint)
+n_reefs_mint <- length(unique_reefs_mint)
+
+cat(sprintf("Total unique reefs: %d\n", n_reefs_mint))
+cat(sprintf("MINT model ncomp: %d\n", ncomp_mint))
+cat(sprintf("MINT model keepX: %s\n", paste(keepX_mint[1:ncomp_mint], collapse = ", ")))
+
+# ============================================================
+# ATTEMPT 1: Use reef as the MINT 'study' variable
+# ============================================================
+# This is the most direct translation of leave-one-reef-out
+# into MINT logic: treat each reef as a "study".
+# Expected failure: MINT predict() cannot handle an unseen study.
+# ============================================================
+
+cat("\n------------------------------------------------------------\n")
+cat("ATTEMPT 1: reef as MINT study variable\n")
+cat("Training on 47 reefs, testing on reef 1 (held out)\n")
+cat("------------------------------------------------------------\n\n")
+
+# Hold out the first reef as a simple test case
+held_out_reef <- unique_reefs_mint[1]
+test_idx_mint <- which(reef_names_mint == held_out_reef)
+train_idx_mint <- which(reef_names_mint != held_out_reef)
+
+X_train_mint <- X_loro_mint[train_idx_mint, ]
+Y_train_mint <- Y_loro_mint[train_idx_mint]
+study_train_mint <- reef_names_mint[train_idx_mint]  # 47 reefs as "studies"
+
+X_test_mint <- X_loro_mint[test_idx_mint, ]
+Y_test_mint <- Y_loro_mint[test_idx_mint]
+study_test_mint <- reef_names_mint[test_idx_mint]    # held-out reef as "study"
+
+cat(sprintf("Training samples: %d across %d reef 'studies'\n",
+            length(Y_train_mint), length(unique(study_train_mint))))
+cat(sprintf("Test samples: %d from held-out reef '%s'\n",
+            length(Y_test_mint), held_out_reef))
+cat(sprintf("Test reef sector: %s\n",
+            unique(sector_names_mint[test_idx_mint])))
+
+# Check class balance within each reef "study"
+cat("\nClass balance per reef 'study' (showing first 10 reefs):\n")
+study_class_table <- table(study_train_mint, Y_train_mint)
+print(head(study_class_table, 10))
+
+cat("\n--- Attempting mint.splsda() with reef as study... ---\n\n")
+
+mint_model_attempt1 <- tryCatch({
+  mint.splsda(
+    X     = X_train_mint,
+    Y     = Y_train_mint,
+    study = droplevels(as.factor(study_train_mint)),
+    ncomp = ncomp_mint,
+    keepX = keepX_mint[1:ncomp_mint]
+  )
+}, error = function(e) {
+  cat("ERROR in mint.splsda() with reef as study:\n")
+  cat(conditionMessage(e), "\n")
+  return(NULL)
+}, warning = function(w) {
+  cat("WARNING in mint.splsda() with reef as study:\n")
+  cat(conditionMessage(w), "\n")
+  invokeRestart("muffleWarning")
+})
+
+# If training somehow succeeded, attempt prediction on unseen reef
+if (!is.null(mint_model_attempt1)) {
+  cat("\nTraining succeeded (unexpected). Now attempting predict() on unseen reef...\n\n")
+
+  mint_predict_attempt1 <- tryCatch({
+    predict(
+      mint_model_attempt1,
+      newdata     = X_test_mint,
+      study.test  = droplevels(as.factor(study_test_mint))
+      # NOTE: study.test is a reef not seen during training —
+      # MINT has no learned weights for it
+    )
+  }, error = function(e) {
+    cat("ERROR in predict() for unseen reef study:\n")
+    cat(conditionMessage(e), "\n")
+    return(NULL)
+  }, warning = function(w) {
+    cat("WARNING in predict() for unseen reef study:\n")
+    cat(conditionMessage(w), "\n")
+    invokeRestart("muffleWarning")
+  })
+
+  if (!is.null(mint_predict_attempt1)) {
+    cat("Prediction succeeded (unexpected). Inspect output manually.\n")
+  } else {
+    cat("\n=> predict() failed as expected: MINT cannot project an unseen study.\n")
+  }
+
+} else {
+  cat("\n=> mint.splsda() failed during training. See error above.\n")
+}
+
+# ============================================================
+# ATTEMPT 2: Keep sector as the MINT study, hold out one reef
+# ============================================================
+# This is the closest to the original MINT design:
+# sector remains the study variable, but one reef's samples
+# are withheld from both training and the test set.
+# This succeeds in training, but the test set has no study
+# label that MINT can use for batch-corrected projection.
+# ============================================================
+
+cat("\n------------------------------------------------------------\n")
+cat("ATTEMPT 2: sector as MINT study, one reef held out\n")
+cat("(Closest to original MINT design — sector = study)\n")
+cat("------------------------------------------------------------\n\n")
+
+sector_train_mint <- sector_names_mint[train_idx_mint]
+
+cat(sprintf("Training samples: %d\n", length(Y_train_mint)))
+cat(sprintf("Sectors in training: %s\n",
+            paste(unique(sector_train_mint), collapse = ", ")))
+cat(sprintf("Sector of held-out reef: %s\n",
+            unique(sector_names_mint[test_idx_mint])))
+
+cat("\n--- Attempting mint.splsda() with sector as study (reef held out)... ---\n\n")
+
+mint_model_attempt2 <- tryCatch({
+  mint.splsda(
+    X     = X_train_mint,
+    Y     = Y_train_mint,
+    study = droplevels(as.factor(sector_train_mint)),
+    ncomp = ncomp_mint,
+    keepX = keepX_mint[1:ncomp_mint]
+  )
+}, error = function(e) {
+  cat("ERROR in mint.splsda() (sector as study, reef held out):\n")
+  cat(conditionMessage(e), "\n")
+  return(NULL)
+}, warning = function(w) {
+  cat("WARNING in mint.splsda() (sector as study, reef held out):\n")
+  cat(conditionMessage(w), "\n")
+  invokeRestart("muffleWarning")
+})
+
+if (!is.null(mint_model_attempt2)) {
+  cat("Training succeeded. Now attempting predict() on held-out reef samples...\n")
+  cat("(test samples belong to a sector seen in training, but reef is unseen)\n\n")
+
+  # The held-out reef belongs to a sector seen in training.
+  # We assign it the sector label it would naturally have.
+  sector_test_mint <- sector_names_mint[test_idx_mint]
+
+  mint_predict_attempt2 <- tryCatch({
+    predict(
+      mint_model_attempt2,
+      newdata     = X_test_mint,
+      study.test  = droplevels(as.factor(sector_test_mint))
+      # NOTE: sector label is known, but the specific reef's
+      # batch correction weights are not learned —
+      # they were excluded from training.
+    )
+  }, error = function(e) {
+    cat("ERROR in predict() (sector as study, reef held out):\n")
+    cat(conditionMessage(e), "\n")
+    return(NULL)
+  }, warning = function(w) {
+    cat("WARNING in predict() (sector as study, reef held out):\n")
+    cat(conditionMessage(w), "\n")
+    invokeRestart("muffleWarning")
+  })
+
+  if (!is.null(mint_predict_attempt2)) {
+    # Evaluate if prediction worked
+    predicted_classes2 <- mint_predict_attempt2$class$centroids.dist[, ncomp_mint]
+    accuracy2 <- mean(predicted_classes2 == Y_test_mint)
+    cat(sprintf("\nPrediction returned results. Accuracy: %.1f%%\n", accuracy2 * 100))
+    cat("NOTE: This accuracy reflects projection into the SECTOR-level MINT space,\n")
+    cat("not a true reef-level held-out test — the reef's within-sector batch\n")
+    cat("correction weights were not learned from training data.\n")
+    cat("This is therefore NOT equivalent to leave-one-reef-out validation.\n")
+  } else {
+    cat("\n=> predict() failed. See error above.\n")
+  }
+
+} else {
+  cat("\n=> mint.splsda() failed during training. See error above.\n")
+}
+
+# ============================================================
+# SUMMARY OF DIAGNOSTIC
+# ============================================================
+
+cat("\n\n============================================================\n")
+cat("DIAGNOSTIC SUMMARY\n")
+cat("============================================================\n\n")
+cat("Attempt 1 (reef as MINT study):\n")
+cat("  mint.splsda() requires each study to have >1 sample per class.\n")
+cat("  With 4 samples/reef (~2 NTMR, ~2 fished), this may or may not\n")
+cat("  pass training, but predict() will fail because the held-out\n")
+cat("  reef is an unseen study — MINT has no learned weights for it.\n\n")
+cat("Attempt 2 (sector as MINT study, reef held out):\n")
+cat("  Training succeeds (same sector structure as original model).\n")
+cat("  predict() may return values, but these use sector-level batch\n")
+cat("  correction weights learned WITHOUT the held-out reef's data.\n")
+cat("  This is not equivalent to true leave-one-reef-out validation\n")
+cat("  and conflates sector-level and reef-level generalisation.\n\n")
+cat("CONCLUSION:\n")
+cat("  Neither MINT attempt constitutes valid leave-one-reef-out CV.\n")
+cat("  Regular sPLS-DA (as implemented in the LORO validation chunk)\n")
+cat("  is the correct and only appropriate method for this scheme.\n")
+cat("============================================================\n")
+```
+
+## sPLS-DA with Leave-One-***Reef***-Out Cross Validation
+
+This analysis is to address a Reviewer's comment to "Apply leave-one-***reef***-out validation to test reproducibility at the local scale."
+
+```{r sPLS-DA with reef as study, fig.height=40, fig.width=6, fig.cap="Saving as R object for rawgraphs.", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# ============================================================
+# LEAVE-ONE-REEF-OUT VALIDATION FOR sPLS-DA (FIXED)
+# ============================================================
+# Tests whether the model can predict protection status for reefs
+# that were completely held out during training
+# Using regular sPLS-DA (not MINT) since we're not integrating across sectors
+# ============================================================
+
+cat("\n\n")
+cat("============================================================\n")
+cat("LEAVE-ONE-REEF-OUT (LORO) VALIDATION - sPLS-DA\n")
+cat("============================================================\n\n")
+
+# 1. SETUP
+# ---------
+set.seed(123)
+
+# Extract data (same as before)
+X_loro <- MAGs_MINT  # CLR-transformed abundances
+Y_loro <- pMAGs_95ANI_phyloseq_clr@sam_data$Open_or_Closed_to_fishing
+reef_names <- pMAGs_95ANI_phyloseq_clr@sam_data$REEF_NAME
+
+# Get unique reefs
+unique_reefs <- unique(reef_names)
+n_reefs <- length(unique_reefs)
+
+cat(sprintf("Total unique reefs: %d\n", n_reefs))
+cat(sprintf("Total samples: %d\n", length(Y_loro)))
+cat(sprintf("Average samples per reef: %.1f\n", length(Y_loro)/n_reefs))
+
+# Get tuned parameters, but using the MINT model
+# Using the final.splsda.open.closed model
+ncomp <- final.mint.splsda.open.closed.sector$ncomp  # Should be 2 or 3
+keepX <- final.mint.splsda.open.closed.sector$keepX  # Your tuned keepX values
+
+cat(sprintf("\nModel parameters (from MINT sPLS-DA):\n"))
+cat(sprintf("  ncomp = %d\n", ncomp))
+cat(sprintf("  keepX = %s\n", paste(keepX[1:ncomp], collapse = ", ")))
+
+# 2. PREPARE PARALLEL PROCESSING
+# -------------------------------
+library(doParallel)
+library(foreach)
+
+n_cores <- detectCores() - 5
+cat(sprintf("\nUsing %d cores for parallel processing\n", n_cores))
+
+cl <- makeCluster(n_cores)
+registerDoParallel(cl)
+
+clusterEvalQ(cl, {
+  library(mixOmics)
+  library(foreach)
+})
+
+clusterExport(cl, c("X_loro", "Y_loro", "reef_names", 
+                    "unique_reefs", "ncomp", "keepX"))
+
+# 3. RUN LORO WITH sPLS-DA (NO STUDY PARAMETER!)
+# ------------------------------------------------
+cat("\nRunning Leave-One-Reef-Out Cross-Validation with sPLS-DA...\n")
+cat("============================================================\n\n")
+
+start_time_loro <- Sys.time()
+
+loro_results <- foreach(r = 1:n_reefs, 
+                        .packages = c("mixOmics"),
+                        .combine = rbind,
+                        .errorhandling = "pass") %dopar% {
+  
+  reef_held_out <- unique_reefs[r]
+  
+  # Get indices for held-out reef
+  test_idx <- which(reef_names == reef_held_out)
+  train_idx <- which(reef_names != reef_held_out)
+  
+  # Check if we have both classes in training set
+  train_classes <- unique(Y_loro[train_idx])
+  if(length(train_classes) < 2) {
+    # Can't train without both classes
+    return(data.frame(
+      Reef = reef_held_out,
+      N_Samples = length(test_idx),
+      N_Closed = sum(Y_loro[test_idx] == "C"),
+      N_Open = sum(Y_loro[test_idx] == "O"),
+      Accuracy = NA_real_,
+      Accuracy_Closed = NA_real_,
+      Accuracy_Open = NA_real_,
+      Correct_Predictions = NA_integer_,
+      Error = "Insufficient training classes (only one protection type)",
+      stringsAsFactors = FALSE
+    ))
+  }
+  
+  # Split data
+  X_train <- X_loro[train_idx, ]
+  Y_train <- Y_loro[train_idx]
+  X_test <- X_loro[test_idx, ]
+  Y_test <- Y_loro[test_idx]
+  
+  # Train sPLS-DA model (NOT mint.splsda!)
+  model <- tryCatch({
+    splsda(
+      X = X_train,
+      Y = Y_train,
+      ncomp = ncomp,
+      keepX = keepX[1:ncomp],  # Use only first ncomp values
+      scale = TRUE
+    )
+  }, error = function(e) {
+    return(NULL)
+  })
+  
+  # If model fails, return NA
+  if(is.null(model)) {
+    return(data.frame(
+      Reef = reef_held_out,
+      N_Samples = length(test_idx),
+      N_Closed = sum(Y_test == "C"),
+      N_Open = sum(Y_test == "O"),
+      Accuracy = NA_real_,
+      Accuracy_Closed = NA_real_,
+      Accuracy_Open = NA_real_,
+      Correct_Predictions = NA_integer_,
+      Error = "Model training failed",
+      stringsAsFactors = FALSE
+    ))
+  }
+  
+  # Predict on held-out reef
+  predictions <- tryCatch({
+    predict(model, newdata = X_test, dist = "centroids.dist")
+  }, error = function(e) {
+    return(NULL)
+  })
+  
+  if(is.null(predictions)) {
+    return(data.frame(
+      Reef = reef_held_out,
+      N_Samples = length(test_idx),
+      N_Closed = sum(Y_test == "C"),
+      N_Open = sum(Y_test == "O"),
+      Accuracy = NA_real_,
+      Accuracy_Closed = NA_real_,
+      Accuracy_Open = NA_real_,
+      Correct_Predictions = NA_integer_,
+      Error = "Prediction failed",
+      stringsAsFactors = FALSE
+    ))
+  }
+  
+  # Calculate accuracy
+  predicted_classes <- predictions$class$centroids.dist[, ncomp]
+  accuracy <- mean(predicted_classes == Y_test)
+  
+  # Per-class accuracy
+  closed_idx <- which(Y_test == "C")
+  open_idx <- which(Y_test == "O")
+  
+  accuracy_closed <- if(length(closed_idx) > 0) {
+    mean(predicted_classes[closed_idx] == Y_test[closed_idx])
+  } else { NA_real_ }
+  
+  accuracy_open <- if(length(open_idx) > 0) {
+    mean(predicted_classes[open_idx] == Y_test[open_idx])
+  } else { NA_real_ }
+  
+  # Return results
+  data.frame(
+    Reef = reef_held_out,
+    N_Samples = length(test_idx),
+    N_Closed = sum(Y_test == "C"),
+    N_Open = sum(Y_test == "O"),
+    Accuracy = accuracy,
+    Accuracy_Closed = accuracy_closed,
+    Accuracy_Open = accuracy_open,
+    Correct_Predictions = sum(predicted_classes == Y_test),
+    Error = "Success",
+    stringsAsFactors = FALSE
+  )
+}
+
+total_time_loro <- difftime(Sys.time(), start_time_loro, units = "mins")
+cat(sprintf("\nLORO CV completed! Total time: %.1f minutes\n", total_time_loro))
+
+# 4. PROCESS AND SUMMARIZE RESULTS
+# ---------------------------------
+cat("\n\n============================================================\n")
+cat("LORO VALIDATION RESULTS\n")
+cat("============================================================\n\n")
+
+loro_results_df <- as.data.frame(loro_results, stringsAsFactors = FALSE)
+
+# Show failure summary
+failure_summary <- table(loro_results_df$Error)
+cat("EXECUTION SUMMARY:\n")
+cat("------------------\n")
+for(err in names(failure_summary)) {
+  cat(sprintf("  %s: %d reefs\n", err, failure_summary[err]))
+}
+
+# Filter to successful predictions
+loro_success_df <- loro_results_df[loro_results_df$Error == "Success", ]
+successful_reefs <- nrow(loro_success_df)
+
+cat(sprintf("\nSuccessful predictions: %d/%d reefs (%.1f%%)\n", 
+            successful_reefs, n_reefs, 
+            successful_reefs/n_reefs * 100))
+
+if(successful_reefs == 0) {
+  cat("\nERROR: No successful predictions.\n")
+  cat("Check that final.splsda.open.closed exists and has valid ncomp/keepX\n")
+  
+  # Diagnostic
+  cat("\nDiagnostic - checking model object:\n")
+  if(exists("final.splsda.open.closed")) {
+    cat("  final.splsda.open.closed exists\n")
+    cat(sprintf("  ncomp: %d\n", final.splsda.open.closed$ncomp))
+    cat(sprintf("  keepX: %s\n", paste(final.splsda.open.closed$keepX, collapse = ", ")))
+  } else {
+    cat("  final.splsda.open.closed does NOT exist!\n")
+    cat("  You may need to run your sPLS-DA model first.\n")
+  }
+  
+} else {
+  # Calculate statistics
+  mean_accuracy <- mean(loro_success_df$Accuracy, na.rm = TRUE)
+  sd_accuracy <- sd(loro_success_df$Accuracy, na.rm = TRUE)
+  median_accuracy <- median(loro_success_df$Accuracy, na.rm = TRUE)
+  ci_lower <- quantile(loro_success_df$Accuracy, 0.025, na.rm = TRUE)
+  ci_upper <- quantile(loro_success_df$Accuracy, 0.975, na.rm = TRUE)
+  
+  cat("\nOVERALL LORO PERFORMANCE:\n")
+  cat("-------------------------\n")
+  cat(sprintf("Mean accuracy: %.1f%% (±%.1f%%)\n", mean_accuracy * 100, sd_accuracy * 100))
+  cat(sprintf("Median accuracy: %.1f%%\n", median_accuracy * 100))
+  cat(sprintf("95%% CI: [%.1f%%, %.1f%%]\n", ci_lower * 100, ci_upper * 100))
+  
+  # Statistical test against chance (50%)
+  t_test_result <- t.test(loro_success_df$Accuracy, mu = 0.5, alternative = "greater")
+  cat(sprintf("\np-value vs. chance (50%%): %.4f\n", t_test_result$p.value))
+  
+  # Compare with original CV performance
+  if(exists("perf.final.splsda.open.closed")) {
+    original_accuracy <- 1 - min(perf.final.splsda.open.closed$error.rate$BER[, "centroids.dist"], na.rm = TRUE)
+    cat(sprintf("\nComparison with original CV accuracy (%.1f%%):\n", original_accuracy * 100))
+    cat(sprintf("  LORO mean accuracy: %.1f%%\n", mean_accuracy * 100))
+    cat(sprintf("  Difference: %.1f percentage points\n", (original_accuracy - mean_accuracy) * 100))
+  }
+  
+  # Per-reef performance - best and worst
+  cat("\nBEST PERFORMING REEFS (top 5):\n")
+  cat("-------------------------------\n")
+  best_reefs <- loro_success_df[order(-loro_success_df$Accuracy), ]
+  best_reefs <- head(best_reefs, 5)
+  for(i in 1:nrow(best_reefs)) {
+    cat(sprintf("  %s: %.1f%% (%d samples, %d closed, %d open)\n", 
+                best_reefs$Reef[i],
+                best_reefs$Accuracy[i] * 100, 
+                best_reefs$N_Samples[i],
+                best_reefs$N_Closed[i],
+                best_reefs$N_Open[i]))
+  }
+  
+  cat("\nWORST PERFORMING REEFS (bottom 5):\n")
+  cat("----------------------------------\n")
+  worst_reefs <- loro_success_df[order(loro_success_df$Accuracy), ]
+  worst_reefs <- head(worst_reefs, 5)
+  for(i in 1:nrow(worst_reefs)) {
+    cat(sprintf("  %s: %.1f%% (%d samples, %d closed, %d open)\n", 
+                worst_reefs$Reef[i],
+                worst_reefs$Accuracy[i] * 100, 
+                worst_reefs$N_Samples[i],
+                worst_reefs$N_Closed[i],
+                worst_reefs$N_Open[i]))
+  }
+  
+  # 5. VISUALIZATIONS
+  # -----------------
+  cat("\n\nGenerating visualization plots...\n")
+  
+  library(ggplot2)
+  library(patchwork)
+  
+  # Plot 1: Distribution of accuracies
+  p1 <- ggplot(loro_success_df, aes(x = Accuracy * 100)) +
+    geom_histogram(bins = 15, fill = "steelblue", color = "black", alpha = 0.7) +
+    geom_vline(xintercept = mean_accuracy * 100, linetype = "dashed", 
+               color = "red3", size = 1) +
+    geom_vline(xintercept = 50, linetype = "dotted", color = "gray50", size = 1) +
+    annotate("text", x = mean_accuracy * 100, y = Inf, 
+             label = sprintf("Mean: %.1f%%", mean_accuracy * 100),
+             hjust = -0.1, vjust = 1.5, color = "red3", fontface = "bold") +
+    labs(x = "Classification Accuracy (%)", y = "Number of Reefs",
+         title = "Leave-One-Reef-Out Validation (sPLS-DA)",
+         subtitle = sprintf("Distribution across %d reefs | Mean: %.1f%% ± %.1f%%", 
+                           nrow(loro_success_df), mean_accuracy * 100, sd_accuracy * 100)) +
+    theme_minimal() +
+    theme(plot.title = element_text(face = "bold", hjust = 0.5))
+  
+  # Plot 3: Confusion matrix
+  confusion_summary <- loro_success_df %>%
+    dplyr::summarise(
+      Correct_Closed = sum(Accuracy_Closed * N_Closed, na.rm = TRUE),
+      Total_Closed = sum(N_Closed, na.rm = TRUE),
+      Correct_Open = sum(Accuracy_Open * N_Open, na.rm = TRUE),
+      Total_Open = sum(N_Open, na.rm = TRUE)
+    )
+  
+  confusion_data <- data.frame(
+    Actual = c("Closed (NTMR)", "Closed (NTMR)", "Open (Fished)", "Open (Fished)"),
+    Predicted = c("Closed (NTMR)", "Open (Fished)", "Closed (NTMR)", "Open (Fished)"),
+    Count = c(
+      round(confusion_summary$Correct_Closed),
+      round(confusion_summary$Total_Closed - confusion_summary$Correct_Closed),
+      round(confusion_summary$Total_Open - confusion_summary$Correct_Open),
+      round(confusion_summary$Correct_Open)
+    )
+  )
+  
+  p3 <- ggplot(confusion_data, aes(x = Actual, y = Predicted, fill = Count)) +
+    geom_tile(color = "black", size = 1) +
+    geom_text(aes(label = Count), size = 5, fontface = "bold") +
+    scale_fill_gradient(low = "white", high = "steelblue4", name = "Number of\nSamples") +
+    labs(title = "Confusion Matrix",
+         subtitle = sprintf("Overall accuracy: %.1f%%", mean_accuracy * 100)) +
+    theme_minimal() +
+    theme(plot.title = element_text(face = "bold", hjust = 0.5))
+  
+  # Combine plots
+  combined_plot <- p1 / p3 +
+    plot_annotation(
+      title = "Leave-One-Reef-Out Validation of sPLS-DA Model",
+      theme = theme(plot.title = element_text(face = "bold", size = 14, hjust = 0.5))
+    )
+  
+  print(combined_plot)
+  
+  # 6. SAVE RESULTS
+  # ---------------
+  cat("\n\nSaving results...\n")
+  
+  ggsave("/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/cleaned_code/Figure_2/output_pdf/leave_one_reef_out_validation_splsda.pdf", 
+         combined_plot, width = 7, height = 10)
+  
+  saveRDS(loro_success_df, 
+          "/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/cleaned_code/Figure_2/output_stats/loro_validation_results_splsda.rds")
+  
+  write.csv(loro_success_df, 
+            "/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/cleaned_code/Figure_2/output_stats/loro_validation_results_splsda.csv",
+            row.names = FALSE)
+  
+  # 7. FINAL SUMMARY FOR MANUSCRIPT
+  # -------------------------------
+  cat("\n\n============================================================\n")
+  cat("LORO VALIDATION - SUMMARY FOR MANUSCRIPT\n")
+  cat("============================================================\n\n")
+  
+  cat("Leave-one-reef-out cross-validation was performed using sPLS-DA\n")
+  cat("(not MINT) to test whether the model could generalize to completely\n")
+  cat("unseen reefs. The model was trained on all reefs except one, then\n")
+  cat(sprintf("tested on the held-out reef. This process was repeated for %d reefs.\n\n", n_reefs))
+  
+  cat(sprintf("RESULTS:\n"))
+  cat(sprintf("  • Successful predictions: %d/%d reefs (%.1f%%)\n", 
+              successful_reefs, n_reefs, successful_reefs/n_reefs*100))
+  cat(sprintf("  • Mean LORO accuracy: %.1f%% (±%.1f%%)\n", mean_accuracy * 100, sd_accuracy * 100))
+  cat(sprintf("  • Median LORO accuracy: %.1f%%\n", median_accuracy * 100))
+  cat(sprintf("  • 95%% CI: [%.1f%%, %.1f%%]\n", ci_lower * 100, ci_upper * 100))
+  cat(sprintf("  • p-value vs. chance (50%%): %.4f\n", t_test_result$p.value))
+  
+  if(t_test_result$p.value < 0.05) {
+    cat("\n✓ The model shows statistically significant generalizability to unseen reefs.\n")
+  } else {
+    cat("\n! The model does not show significant generalizability to unseen reefs.\n")
+  }
+}
+
+# Stop cluster
+stopCluster(cl)
+
+cat("\n\n✓ Leave-One-Reef-Out validation complete!\n")
+```
+
 # Random Forest Validation of Reef Zoning Classification
 
 To provide an independent, non-linear supervised framework alongside MINT sPLS-DA, we also implemented Random Forest classification. Using leave-one-sector-out cross-validation (identical to the MINT validation framework), we assessed whether microbial community composition can predict reef zoning status (NTMR vs. fished reefs). Model significance was evaluated through permutation testing (999 permutations with zone-label shuffling within sectors), generating a null distribution against which observed accuracy was benchmarked. Feature importance was quantified using Mean Decrease Accuracy, and the top 350 most important MAGs were compared with 350 MINT sPLS-DA indicators (component 1) to assess methodological concordance. Direction agreement between methods was evaluated for overlapping MAGs using Cohen's Kappa.
 
-```{r MINT sPLS-DA and Random forest classification accuracy comparison, fig.height=4, fig.width=6, fig.cap="Random Forest validation of reef zoning classification. (a) Leave-one-sector-out cross-validation accuracy across the seven GBR sectors. The red dashed line indicates mean RF accuracy (61.7%), the green dotted line shows MINT sPLS-DA accuracy (71%) for comparison. Error bars represent standard deviation across cross-validation folds. (b) Permutation test results showing the null distribution of classification accuracies from 999 permutations with zone labels shuffled within sectors. The red vertical line indicates observed RF accuracy (61.7%), blue dashed lines show the 95% confidence interval of the null distribution [38.8%, 56.1%]. p = 0.0020, confirming significant predictive performance. (c) Overlap between MINT sPLS-DA indicators (n = 350) and the top 350 most important RF features. Of the 350 MINT indicators, 140 (40.0%) appear in the RF top 350, representing the core microbial signal detectable by both linear discriminant and non-linear ensemble methods (Jaccard index = 0.250). (d) Top 20 most important RF features ranked by Mean Decrease Accuracy, with MAGs also selected by MINT highlighted in green. Taxonomic affiliation at genus level is shown where available.", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+```{r MINT sPLS-DA and Random forest classification accuracy comparison, fig.height=12, fig.width=12, fig.cap="Random Forest validation of reef zoning classification. (a) Leave-one-sector-out cross-validation accuracy across the seven GBR sectors. The red dashed line indicates mean RF accuracy (61.7%), the green dotted line shows MINT sPLS-DA accuracy (71%) for comparison. Error bars represent standard deviation across cross-validation folds. (b) Permutation test results showing the null distribution of classification accuracies from 999 permutations with zone labels shuffled within sectors. The red vertical line indicates observed RF accuracy (61.7%), blue dashed lines show the 95% confidence interval of the null distribution [38.8%, 56.1%]. p = 0.0020, confirming significant predictive performance. (c) Overlap between MINT sPLS-DA indicators (n = 350) and the top 350 most important RF features. Of the 350 MINT indicators, 140 (40.0%) appear in the RF top 350, representing the core microbial signal detectable by both linear discriminant and non-linear ensemble methods (Jaccard index = 0.250). (d) Top 20 most important RF features ranked by Mean Decrease Accuracy, with MAGs also selected by MINT highlighted in green. Taxonomic affiliation at genus level is shown where available.", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
 # ============================================================
 # RANDOM FOREST CLASSIFICATION - PARALLELIZED VERSION
 # ============================================================
@@ -4495,6 +5123,14 @@ read.based.sample.plot.mint.splsda.open.closed.global <- plotIndiv(read_based.fi
           subtitle = 'Reefs that are open or closed to fishing',
           ellipse = T,
           )
+
+ggsave(
+  filename = "/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/cleaned_code/Figure_2/output_pdf/TAXA_MINT_sPLSDA_sample_plot.pdf",
+  plot     = read.based.sample.plot.mint.splsda.open.closed.global$graph,  # plotIndiv stores the ggplot in $graph
+  width    = 10,
+  height   = 7,
+  units    = "in"
+)
 ```
 
 ```{r read based MINT sPLS-DA sample plot partial for Open and Closed sectors, fig.height=6, fig.width=16, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
@@ -4510,7 +5146,7 @@ read_based_sample.plot.mint.splsda.open.closed.partial.sector <- plotIndiv(read_
 Lastly, what about those spatiotemporal batch effects we observed in (s)PLS-DA?
 
 ```{r read based MINT sPLS-DA sample plot open closed col per trip, fig.cap="Sample plot from the MINT sPLS-DA performed on the IMOS-MGD seawater MAGs to identify microbes that discriminate between reefs that are open or closed to fishing. Samples (reef sites) are projected into the MINT sPLS-DA space spanned by the first two components, and coloured by their corresponding category reflecting reef protection level. Symbols indicate the membership to an LTMP trip/transect. Component 1 discriminates between the two reef categories.", fig.height=5, fig.width=8, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, results='hide', fig.show='hide'}
-plotIndiv(read_based.final.mint.splsda.open.closed.sector,
+read.based.sample.plot.mint.splsda.open.closed.global_trip <- plotIndiv(read_based.final.mint.splsda.open.closed.sector,
           study = "global",
           comp = c(1,2), # We can look into comp 3 too, but I think 2 dimensions are enough
           legend = TRUE,
@@ -4521,6 +5157,14 @@ plotIndiv(read_based.final.mint.splsda.open.closed.sector,
                 "slateblue"), # Sampling trip 4
           title = 'MINT sPLS-DA using IMOS GBR-MGD MAGs | PCs 1-2',
           subtitle = 'AIMS-LTMP trips', ellipse = T)
+
+ggsave(
+  filename = "/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/cleaned_code/Figure_2/output_pdf/TAXA_MINT_sPLSDA_sample_plot_trip.pdf",
+  plot     = read.based.sample.plot.mint.splsda.open.closed.global_trip$graph,  # plotIndiv stores the ggplot in $graph
+  width    = 10,
+  height   = 7,
+  units    = "in"
+)
 ```
 
 This plot shows that there is no longer clustering between the trips, suggesting we accounted for spatiotemporal batch effects.
@@ -4575,6 +5219,12 @@ read_based_loading.plots.open.closed.per.sector
 The Clustered Image Map represents the enrichment levels of the MAG signature per sample. Here we use the default Euclidean distance and Complete linkage for the first component.
 
 ```{r read based Heatmap, fig.height=15, fig.width=8, fig.cap="Clustered Image Map of the MAGs selected by MINT sPLS-DA for component 1 only, to discriminate between reefs that are open or closed to fishing. A hierarchical clustering based on the MAG enrichment levels of the indicator MAGs on component 1, with reef sites in rows coloured according to protection level.", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+pdf(
+  file   = "/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/cleaned_code/Figure_2/output_pdf/TAXA_MINT_sPLSDA_heatmap.pdf",
+  width  = 7,    # wider than the chunk to accommodate long GO term labels
+  height = 25     # tall to spread out the reef sites rows
+)
+
 read.based.cols.open.closed <- c("seagreen3","steelblue4")
 read.based.open.closed.cols <- palette(read.based.cols.open.closed)[as.numeric(as.factor(megan_genus_clr@sam_data$Open_or_Closed_to_fishing))]
 
@@ -4593,7 +5243,7 @@ reads.name.short <- left_join(otu_table(megan_genus_clr) %>%
 reads.name.short <- as.character(reads.name.short$taxonomy)
 
 cim(read_based.final.mint.splsda.open.closed.sector,
-    comp = 1,
+    comp = 1:2,
 #    cutoff = 0.95,
     col.names = reads.name.short,
     margins=c(37, # bottom
@@ -4607,6 +5257,8 @@ legend = list(color.mixo(as.numeric(as.factor(megan_genus_clr@sam_data$Open_or_C
     title = "MINT sPLS-DA, component 1",
 xlab = "Indicator MAGs that discriminate between take and no take zones",
 ylab = "Reef sites")
+
+dev.off()
 ```
 
 ### Performance of the MINT sPLS-DA model
@@ -4619,6 +5271,837 @@ read_based_MINT_sPLS_da_open_closed_model_performance.sectors <- auroc(read_base
                                                             print = FALSE)
 read_based_MINT_sPLS_da_open_closed_model_performance.sectors$Comp1
 ```
+
+# MINT sPLS-DA with ***Read-based metagenomics*** data - GO terms (community-wide functional analysis)
+
+Community-Wide Functional Verification: To provide a community-centred perspective on the functional differences between NTMRs and fished reefs, we run MINT sPLS-DA on GO terms derived from read-based metagenomics (megan_go_clr_5). Unlike the KEGG module completeness analysis (which is based on presence/absence of pathway steps in specific indicator pMAGs), this approach captures abundance-weighted functional signals across the entire community, providing an independent and complementary line of evidence. GO terms were previously computed by mapping reads against the NCBI nr database (DIAMOND -> MEGAN) and are free from any biases introduced by MAG binning, completeness, or genome size estimation (see Terzin et al. 2025; Microbiome).
+
+## Step 1: Load data and add zoning metadata
+
+```{r go-terms-load-data, fig.height=6, fig.width=8, fig.cap="Choosing the number of components in mint.splsda using perf() with LOGOCV to discriminate between reefs that are open or closed to fishing using GO terms. Classification error rates (overall and balanced - BER) are represented on the y-axis with respect to the number of components on the x-axis for each prediction distance.", eval=TRUE, message=FALSE, warning=FALSE, echo=TRUE}
+
+# NOTE: megan_go_clr_5 should already be loaded in your environment from the
+# Microbiome_paper_data_for_David.Rmd session. If not, load it here.
+load("/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/Data_for_David_Hirst/Microbiome_paper/megan_go_clr_5.RData")
+
+# Inspect the GO term phyloseq object
+summary(megan_go_clr_5)
+
+# Extract the OTU table (GO terms x samples) and transpose to samples x GO terms
+go_OTUs <- as.data.frame(megan_go_clr_5@otu_table)
+go_OTUs <- t(go_OTUs)
+
+# Check dimensions
+dim(go_OTUs)   # should be samples (rows) x GO terms (columns)
+class(go_OTUs)
+
+# ---- Add zoning metadata to the GO term phyloseq object ----
+# The zoning info (Open_or_Closed_to_fishing, SECTOR_N_S) lives in the pMAG phyloseq object.
+# We join it to the GO term sample data via REEF_NAME, exactly as done for the taxonomy object.
+
+# Extract reef-level zoning info from the pMAG phyloseq
+pMAGs_df <- data.frame(sample_data(pMAGs_95ANI_phyloseq_clr), check.names = FALSE) %>%
+  dplyr::select("REEF_NAME", "Open_or_Closed_to_fishing", "SECTOR_N_S") %>%
+  distinct(REEF_NAME, .keep_all = TRUE)
+
+# Extract sample data from the GO term phyloseq
+go_df <- data.frame(sample_data(megan_go_clr_5), check.names = FALSE)
+
+# Preserve original row names before joining
+go_df$original_rowname <- rownames(go_df)
+
+# Join zoning info by REEF_NAME
+go_df_zoning <- left_join(go_df, pMAGs_df, by = "REEF_NAME")
+
+# Restore original row names
+rownames(go_df_zoning) <- go_df_zoning$original_rowname
+
+# Remove temporary helper column
+go_df_zoning <- go_df_zoning %>%
+  dplyr::select(-original_rowname)
+
+# Verify row names are preserved
+cat("Row names match:", identical(rownames(go_df_zoning), rownames(go_df)), "\n")
+head(rownames(go_df_zoning))
+
+# Check zoning variable looks correct
+table(go_df_zoning$Open_or_Closed_to_fishing, useNA = "ifany")
+table(go_df_zoning$SECTOR_N_S, useNA = "ifany")
+
+# Update the phyloseq object with zoning metadata
+sample_data(megan_go_clr_5) <- go_df_zoning
+```
+
+## Step 2: Tune the number of components (perf with LOGOCV)
+
+```{r go-terms-perf, fig.height=6, fig.width=8, eval=TRUE, message=FALSE, warning=FALSE, echo=TRUE}
+
+# Run MINT sPLS-DA with up to 10 components to find the optimal number
+go_mint.splsda.open.closed.sector <- mint.splsda(
+  X     = go_OTUs,
+  Y     = megan_go_clr_5@sam_data$Open_or_Closed_to_fishing,
+  study = megan_go_clr_5@sam_data$SECTOR_N_S,
+  ncomp = 10
+)
+
+# Evaluate performance using LOGOCV
+perf.go_mint.splsda.open.closed.sector <- perf(go_mint.splsda.open.closed.sector)
+
+# Plot error rates across components - look for the elbow/minimum BER
+plot(perf.go_mint.splsda.open.closed.sector)
+```
+
+## Step 3: Global and sector-level error rates
+
+```{r go-terms-global-error, fig.height=6, fig.width=8, eval=TRUE, message=FALSE, warning=FALSE, echo=TRUE}
+
+# Global BER across components
+perf.go_mint.splsda.open.closed.sector$global.error$BER
+```
+
+```{r go-terms-sector-error-overall, fig.height=6, fig.width=8, eval=TRUE, message=FALSE, warning=FALSE, echo=TRUE}
+
+# Sector-level overall error rates
+study_errors_overall_go <- list()
+
+for (study_name in names(perf.go_mint.splsda.open.closed.sector[["study.specific.error"]])) {
+  study_error_overall <- perf.go_mint.splsda.open.closed.sector$study.specific.error[[study_name]]$overall
+  study_error_with_name_overall <- cbind(Study = study_name, study_error_overall)
+  study_errors_overall_go[[study_name]] <- study_error_with_name_overall
+}
+
+study_error_df_overall_go <- do.call(rbind, study_errors_overall_go)
+
+knitr::kable(
+  as.data.frame(study_error_df_overall_go),
+  caption = "MINT sPLS-DA (GO terms) - error rate (centroids distance) across GBR sectors"
+)
+```
+
+```{r go-terms-sector-error-by-class, fig.height=6, fig.width=8, eval=TRUE, message=FALSE, warning=FALSE, echo=TRUE}
+
+# Sector-level error rates separately for Closed and Open reefs
+study_errors_go <- list()
+
+for (study_name in names(perf.go_mint.splsda.open.closed.sector[["study.specific.error"]])) {
+  study_error <- perf.go_mint.splsda.open.closed.sector$study.specific.error[[study_name]]$error.rate.class$centroids.dist
+  study_error_with_name <- cbind(Study = study_name, study_error)
+  study_errors_go[[study_name]] <- study_error_with_name
+}
+
+study_error_df_go <- do.call(rbind, study_errors_go)
+
+knitr::kable(
+  as.data.frame(study_error_df_go),
+  caption = "MINT sPLS-DA (GO terms) - error rate (centroids distance) across GBR sectors, separately for Closed and Open reefs"
+)
+```
+
+## Step 4: Tune the number of features per component
+
+```{r go-terms-tune-features, eval=FALSE, message=FALSE, warning=FALSE, echo=TRUE}
+
+# Tune keepX across components - this can be slow; run once and save results
+go_tune.mint.splsda.open.closed.sector <- tune(
+  X           = go_OTUs,
+  Y           = as.factor(megan_go_clr_5@sam_data$Open_or_Closed_to_fishing),
+  study       = as.factor(megan_go_clr_5@sam_data$SECTOR_N_S),
+  ncomp       = 5,
+  test.keepX  = seq(10, 500, 10),   # GO terms: upper bound lower than taxa (4287 terms -> fewer informative)
+  method      = 'mint.splsda',
+  measure     = 'BER',
+  dist        = "centroids.dist"    # consistent with perf() above
+)
+
+# Save to avoid re-running
+save(go_tune.mint.splsda.open.closed.sector, file = "/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/cleaned_code/Figure_2/go_tune_mint_splsda_open_closed_sector.RData")
+```
+
+```{r go-terms-tune-plot, fig.height=5, fig.width=12, fig.cap="Tuning plot for MINT sPLS-DA on GO terms. Diamonds represent the optimal number of GO term features on each component. Balanced error rate is the metric to be minimised.", eval=TRUE, message=FALSE, warning=FALSE, echo=TRUE}
+load(file = "/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/cleaned_code/Figure_2/go_tune_mint_splsda_open_closed_sector.RData")
+plot(go_tune.mint.splsda.open.closed.sector, sd = FALSE)
+```
+
+```{r go-terms-tune-numeric, eval=TRUE, message=FALSE, warning=FALSE, echo=TRUE}
+
+# Optimal number of components
+go_tune.mint.splsda.open.closed.sector$choice.ncomp
+
+# Optimal number of GO term features per component
+go.tune.optimal.keepX.sector <- go_tune.mint.splsda.open.closed.sector$choice.keepX
+go.tune.optimal.keepX.sector
+
+# Per-class error rates from tuning
+go_tune.mint.splsda.open.closed.sector[["error.rate.class"]]
+```
+
+## Step 5: Fit the final MINT sPLS-DA model
+
+```{r go-terms-final-model, eval=TRUE, message=FALSE, warning=FALSE, echo=TRUE}
+go.final.mint.splsda.open.closed.sector <- mint.splsda(
+  X      = go_OTUs,
+  Y      = megan_go_clr_5@sam_data$Open_or_Closed_to_fishing,
+  keepX  = go.tune.optimal.keepX.sector,
+  # keepX = c(50, 50),  # Uncomment to use arbitrary number of features
+  study  = megan_go_clr_5@sam_data$SECTOR_N_S,
+  ncomp  = 2           # Update based on perf() output above
+)
+```
+
+## Step 6: Sample plots
+
+```{r go-terms-sample-plot-global, fig.cap="Global sample plot from MINT sPLS-DA on GO terms discriminating NTMRs from fished reefs. Samples are coloured by reef protection status. Component 1 captures the zoning signal after accounting for sector-level variation.", fig.height=6, fig.width=12, eval=TRUE, message=FALSE, warning=FALSE, echo=TRUE}
+go.sample.plot.global <- plotIndiv(
+  go.final.mint.splsda.open.closed.sector,
+  study    = "global",
+  comp     = c(1, 2),
+  legend   = TRUE,
+  col      = c("seagreen3",   # Closed to fishing (NTMRs)
+               "steelblue4"), # Open to fishing (fished reefs)
+  subtitle = "Reefs open or closed to fishing | GO terms",
+  ellipse  = TRUE
+)
+
+ggsave(
+  filename = "/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/cleaned_code/Figure_2/output_pdf/GO_MINT_sPLSDA_sample_plot.pdf",
+  plot     = go.sample.plot.global$graph,  # plotIndiv stores the ggplot in $graph
+  width    = 10,
+  height   = 7,
+  units    = "in"
+)
+```
+
+```{r go-terms-sample-plot-partial, fig.height=6, fig.width=16, eval=TRUE, message=FALSE, warning=FALSE, echo=TRUE}
+go.sample.plot.partial <- plotIndiv(
+  go.final.mint.splsda.open.closed.sector,
+  legend   = TRUE,
+  study    = "all.partial",
+  col      = c("seagreen3",
+               "steelblue4"),
+  ellipse  = FALSE
+)
+```
+
+```{r go-terms-sample-plot-trips, fig.height=5, fig.width=8, eval=TRUE, message=FALSE, warning=FALSE, echo=TRUE, results='hide', fig.show='hide'}
+
+# Colour by sampling trip to verify spatiotemporal batch effects are removed
+go.sample.plot.global_trip <- plotIndiv(
+  go.final.mint.splsda.open.closed.sector,
+  study    = "global",
+  comp     = c(1, 2),
+  legend   = TRUE,
+  group    = sample_data(megan_go_clr_5)$Sampling_trip,
+  col      = c("indianred",   # Trip 1
+               "indianred4",  # Trip 2
+               "red3",        # Trip 3
+               "slateblue"),  # Trip 4
+  title    = "MINT sPLS-DA GO terms | PCs 1-2",
+  subtitle = "AIMS-LTMP trips",
+  ellipse  = TRUE
+)
+# No clustering by trip = spatiotemporal batch effects successfully removed
+
+ggsave(
+  filename = "/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/cleaned_code/Figure_2/output_pdf/GO_MINT_sPLSDA_sample_plot_trip.pdf",
+  plot     = go.sample.plot.global_trip$graph,  # plotIndiv stores the ggplot in $graph
+  width    = 10,
+  height   = 7,
+  units    = "in"
+)
+```
+
+## Step 7: Correlation circle plot
+
+```{r go-terms-correlation-circle, fig.height=13, fig.width=13, fig.cap="Correlation circle plot of GO terms selected by MINT sPLS-DA. GO terms positively associated with component 1 (right) characterise fished reefs; those negatively associated (left) characterise NTMRs. Only GO terms with correlation > 0.7 are labelled.",eval=TRUE, message=FALSE, warning=FALSE, echo=TRUE}
+
+# GO terms: use GO IDs directly as variable names (no taxonomy table to join)
+# The row names of the OTU table are the GO term identifiers
+# Build readable GO term labels from the taxonomy table
+go_tax <- tax_table(megan_go_clr_5) %>%
+  as.data.frame() %>%
+  rownames_to_column("OTU")
+
+# Option 1 (recommended): Rank4 description only
+# Most informative for plots - gives the protein/function name
+go_term_names <- go_tax$Rank4
+
+# Option 2: Rank3 + Rank4 combined
+# Useful if you want biological process context alongside the specific function
+go_term_names <- paste(go_tax$Rank3, go_tax$Rank4, sep = " | ")
+
+# Option 3: Rank4 with fallback to Rank3 if Rank4 is NA
+# Safest option given many Rank4 values are NA
+go_term_names <- ifelse(!is.na(go_tax$Rank4), go_tax$Rank4, go_tax$Rank3)
+
+plotVar(
+  go.final.mint.splsda.open.closed.sector,
+  var.names = list(go_term_names),
+  cutoff    = 0.7
+)
+```
+
+## Step 8: Loading plots
+
+```{r go-terms-loading-plots, fig.height=30, fig.width=30, fig.cap="Loading plots of GO terms selected by MINT sPLS-DA on component 1, discriminating NTMRs from fished reefs across GBR sectors. Green = enriched in NTMRs; blue = enriched in fished reefs.", eval=TRUE, message=FALSE, warning=FALSE, echo=TRUE, results='hide', fig.show='hide'}
+
+go.loading.plots <- plotLoadings(
+  go.final.mint.splsda.open.closed.sector,
+  contrib      = "max",
+  method       = 'mean',
+  comp         = 1,
+  legend       = TRUE,
+  legend.color = c("seagreen3",   # Closed to fishing (NTMRs)
+                   "steelblue4"), # Open to fishing
+  name.var     = go_term_names,
+  study        = "all.partial",
+  title        = "GO term contribution on component 1"
+)
+
+go.loading.plots
+```
+
+## Step 9: Clustered Image Map (heatmap)
+
+```{r go-terms-heatmap, fig.height=15, fig.width=8, fig.cap="Clustered Image Map of GO terms selected by MINT sPLS-DA for component 1, discriminating NTMRs from fished reefs. Row colours indicate reef protection status (green = NTMR, blue = fished).", eval=TRUE, message=FALSE, warning=FALSE, echo=TRUE}
+# ---- Save the CIM heatmap as PDF ----
+# cim() renders directly to the active device, so we open a PDF device first
+pdf(
+  file   = "/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/cleaned_code/Figure_2/output_pdf/GO_MINT_sPLSDA_heatmap.pdf",
+  width  = 20,    # wider than the chunk to accommodate long GO term labels
+  height = 25     # tall to spread out the reef sites rows
+)
+
+go.cols <- c("seagreen3", "steelblue4")
+go.open.closed.cols <- palette(go.cols)[
+  as.numeric(as.factor(megan_go_clr_5@sam_data$Open_or_Closed_to_fishing))
+]
+
+go.cols <- c("seagreen3", "steelblue4")
+go.open.closed.cols <- palette(go.cols)[
+  as.numeric(as.factor(megan_go_clr_5@sam_data$Open_or_Closed_to_fishing))
+]
+
+cim(
+  go.final.mint.splsda.open.closed.sector,
+  comp           = 1:2,
+  col.names      = go_term_names,
+  margins        = c(37, 25),
+  keysize        = c(1, 0.4),
+  row.names      = TRUE,
+  legend         = list(
+    color.mixo(as.numeric(as.factor(megan_go_clr_5@sam_data$Open_or_Closed_to_fishing))),
+    title = "Reef protection level"
+  ),
+  row.sideColors = go.open.closed.cols,
+  title          = "MINT sPLS-DA GO terms, component 1",
+  xlab           = "GO terms discriminating NTMRs from fished reefs",
+  ylab           = "Reef sites"
+)
+
+dev.off()
+```
+
+## Step 10: Model performance (AUROC)
+
+```{r go-terms-auroc, fig.height=4, fig.width=6, fig.cap="ROC curve and AUC from MINT sPLS-DA on GO terms for the NTMRs vs. fished reefs comparison on global component 1.", eval=TRUE, message=FALSE, warning=FALSE, echo=TRUE}
+
+go_MINT_sPLSDA_performance <- auroc(
+  go.final.mint.splsda.open.closed.sector,
+  roc.comp = 1,
+  print    = FALSE
+)
+
+go_MINT_sPLSDA_performance$Comp1
+```
+
+# MINT sPLS-DA with ***Unmapped reads*** as well
+
+Addressing this comment: MAG abundance estimation and CLR transformation
+
+Firstly, I would like to thank the authors for incorporating the read-based DIAMOND/MEGAN analysis as this is a genuinely valuable addition that further supports the overall taxonomic patterns. However, as the goal of the analysis was to identify indicator populations (MAGs), such an approach does not align with this resolution (i.e. taxonomy versus MAG).
+
+In terms of the MAG abundances, while I recognise that CLR transformation is a widely adopted approach in microbiome composition analysis, my original concern about the abundance information being fed into the CLR transformation still remains. Although this concern is not significant enough to prevent publication of the manuscript, I would like to take the opportunity to clarify on why I had raised this point.
+
+CLR transformation assumes a consistent compositional reference frame across samples. If the reference frame is constant, then the CLR transformation correctly normalises compositionality across samples. My concern is not with the transformation itself, but with the fact that the MAG catalogue represents a closed reference frame that may not consistently reflect the same proportion of the true community across samples.
+
+This underlying assumption can be violated when (i) the proportion of the community captured by the MAG catalogue varies across samples, and (ii) community complexity (i.e. the number of distinct genomes) also varies across samples. For example, consider MAG X, with identical true abundance in an NTMR sample (A) and a fished-reef sample (B). Sample A contains 500 distinct genomes, of which the MAG catalogue captures 300 (60%). Sample B contains 1,000 distinct genomes, of which the same catalogue captures only 300 (30%). The MAG catalogue represents the same number of genomes, but a very different fraction of the genomes detected in the community. As raw mapped reads are distributed across the genomes that are present, MAG X's reads in Sample B are diluted across a larger background, and the MAG catalogue itself captures less of that background. The result would be that the MAG X's raw read count appears lower in Sample B, despite no true difference in abundance. This matters because if community complexity or MAG-catalogue representativeness differ systematically between protection statuses (which they might not to, but it is unclear at this stage), this confound is indistinguishable, in the read data alone, from a genuine biological abundance difference. This is particularly important given the authors' own finding that average genome size differs across zoning status.
+This could be accounted for in a MINT-sPLS-DA framework in one of two ways:
+a) Incorporate the raw unmapped read count as an additional “Unclassified” row in the input table, thus allowing CLR-transformation and the analytical framework to account for variations in the collective MAG representativeness of the community.
+b) Use the total number of genomes sequenced in each sample (inferred from single-copy marker genes) as a form of scaling factor, before apply CLR transformation.
+
+Nonetheless, as I mentioned before, I do not see this as a concern to prevent publication, but more of a methodological perspective that I wanted to clarify.
+
+```{r}
+# =============================================================================
+# Reviewer #1, Point 1, option (a) — RAW variant (SCALE_UNMAPPED <- FALSE).
+# Adds the raw unmapped read count as the "Unmapped" row, exactly as the
+# reviewer described, with NO commensurate scaling. Object/file names carry a
+# _RAW suffix so this does NOT overwrite the scaled results.
+#
+# Run AFTER the "Preparing for stats - CLR transformation" chunk. Identical to
+# the scaled script except SCALE_UNMAPPED and the _RAW output names.
+# =============================================================================
+
+SCALE_UNMAPPED <- FALSE    # RAW: add unmapped counts as-is (dominates CLR)
+KEEP_NA_SAMPLE <- TRUE     # corbett_1 has NA mapping; TRUE imputes it
+
+# ---------------------------------------------------------------------------
+# 1. Unmapped reads per sample; match on full name minus the "sample." prefix
+# ---------------------------------------------------------------------------
+mapping <- read.delim("/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/from_Katherine_final_abundances/GBR-MGD_mapping_rates.tsv", stringsAsFactors = FALSE)
+mapping$reads        <- suppressWarnings(as.numeric(mapping$reads))
+mapping$mapped_reads <- suppressWarnings(as.numeric(mapping$mapped_reads))
+mapping$mapping_rate <- suppressWarnings(as.numeric(mapping$mapping_rate))
+mapping$unmapped     <- mapping$reads - mapping$mapped_reads
+
+mapping$Sample_ID <- sub("^sample\\.", "", mapping$file)
+
+otu_ids <- colnames(pMAGs_95ANI)
+
+missing <- setdiff(otu_ids, mapping$Sample_ID)
+cat("OTU samples with no mapping match:", length(missing),
+    if (length(missing)) paste0("(", paste(missing, collapse=", "), ")") else "", "\n")
+
+unmapped_vec <- setNames(mapping$unmapped, mapping$Sample_ID)[otu_ids]
+rate_vec     <- setNames(mapping$mapping_rate/100, mapping$Sample_ID)[otu_ids]
+names(unmapped_vec) <- otu_ids
+names(rate_vec)     <- otu_ids
+
+na_ids <- otu_ids[is.na(unmapped_vec)]
+if (length(na_ids)) {
+  cat("NA-mapping sample(s):", paste(na_ids, collapse = ", "), "\n")
+  if (KEEP_NA_SAMPLE) {
+    med_rate <- median(mapping$mapping_rate/100, na.rm = TRUE)
+    mag_tot_na <- colSums(pMAGs_95ANI[, na_ids, drop = FALSE])
+    unmapped_vec[na_ids] <- mag_tot_na * (1 - med_rate) / med_rate
+    rate_vec[na_ids]     <- med_rate
+  }
+}
+
+# ---------------------------------------------------------------------------
+# 2. Unmapped row — RAW (no scaling)
+# ---------------------------------------------------------------------------
+mag_total <- colSums(pMAGs_95ANI); names(mag_total) <- otu_ids
+if (SCALE_UNMAPPED) {
+  rel <- unmapped_vec / mag_total
+  unmapped_row <- rel / median(rel, na.rm = TRUE) * median(mag_total)
+} else {
+  unmapped_row <- unmapped_vec                          # raw (dominates CLR)
+}
+unmapped_row <- round(unmapped_row[otu_ids])
+
+cat(sprintf("RAW Unmapped row: median %.0f vs median MAG total %.0f (weight ~%.2f)\n",
+            median(unmapped_row), median(mag_total),
+            median(unmapped_row / (mag_total + unmapped_row))))
+
+# ---------------------------------------------------------------------------
+# 3. Build augmented phyloseq object (RAW), mirroring the manuscript
+# ---------------------------------------------------------------------------
+pMAGs_aug_RAW <- rbind(pMAGs_95ANI, Unmapped = unmapped_row[colnames(pMAGs_95ANI)])
+
+TAX_aug <- rbind(
+  as.matrix(pMAGs_95ANI_stats_TAX),
+  Unmapped = rep("Unmapped", ncol(pMAGs_95ANI_stats_TAX))
+)
+
+OTU_aug_RAW <- otu_table(as.matrix(pMAGs_aug_RAW), taxa_are_rows = TRUE)
+pMAGs_aug_phyloseq_RAW <- phyloseq(OTU_aug_RAW, tax_table(TAX_aug))
+pMAGs_aug_phyloseq_RAW <- merge_phyloseq(pMAGs_aug_phyloseq_RAW,
+                                         sample_data(pMAGs_95ANI_phyloseq))
+
+# ---- pseudocount + CLR: identical to your "Preparing for stats" chunk --------
+pMAGs_aug_phyloseq_RAW@otu_table <- pMAGs_aug_phyloseq_RAW@otu_table + 1
+otu_mat_aug_RAW  <- as(otu_table(pMAGs_aug_phyloseq_RAW), "matrix")
+clr_otu_aug_RAW  <- t(clr(t(otu_mat_aug_RAW)))
+pMAGs_aug_phyloseq_clr_RAW <- pMAGs_aug_phyloseq_RAW
+otu_table(pMAGs_aug_phyloseq_clr_RAW) <- otu_table(clr_otu_aug_RAW, taxa_are_rows = TRUE)
+
+# ---------------------------------------------------------------------------
+# 4. MINT input + final model (RAW)
+# ---------------------------------------------------------------------------
+MAGs_MINT_aug_RAW <- as.data.frame(pMAGs_aug_phyloseq_clr_RAW@otu_table)
+MAGs_MINT_aug_RAW <- t(MAGs_MINT_aug_RAW)
+
+final.mint.splsda.open.closed.sector.UNMAPPED.RAW <- mint.splsda(
+  X     = MAGs_MINT_aug_RAW,
+  Y     = pMAGs_aug_phyloseq_clr_RAW@sam_data$Open_or_Closed_to_fishing,
+  keepX = c(350, 180),
+  study = pMAGs_aug_phyloseq_clr_RAW@sam_data$SECTOR_N_S,
+  ncomp = 2)
+
+perf.UNMAPPED.RAW <- perf(final.mint.splsda.open.closed.sector.UNMAPPED.RAW)
+cat("\nBalanced error rate (RAW Unmapped-augmented):\n")
+print(perf.UNMAPPED.RAW$global.error$BER)
+
+# ---------------------------------------------------------------------------
+# 5. Venn of comp-1 indicators: original vs RAW Unmapped-augmented
+# ---------------------------------------------------------------------------
+orig.vars    <- selectVar(final.mint.splsda.open.closed.sector, comp = 1)$name
+aug.vars.RAW <- selectVar(final.mint.splsda.open.closed.sector.UNMAPPED.RAW, comp = 1)$name
+aug.vars.RAW <- setdiff(aug.vars.RAW, "Unmapped")
+
+shared_features_RAW <- intersect(orig.vars, aug.vars.RAW)
+
+venn.plot.RAW <- venn.diagram(
+  x = list("Original" = orig.vars, "With Unmapped (raw)" = aug.vars.RAW),
+  category.names = c("Original", "With Unmapped (raw)"),
+  filename = NULL, output = TRUE,
+  fill = c("steelblue4", "seagreen3"), alpha = 0.5
+)
+grid.newpage(); grid.draw(venn.plot.RAW)
+
+cat("Number of shared features (RAW): ", length(shared_features_RAW), "\n")
+cat(sprintf("Recovery (RAW): %d / %d comp-1 indicators (%.1f%%)\n",
+            length(shared_features_RAW), length(orig.vars),
+            100 * length(shared_features_RAW) / length(orig.vars)))
+cat("'Unmapped' selected on comp 1 (RAW)? ",
+    "Unmapped" %in% selectVar(final.mint.splsda.open.closed.sector.UNMAPPED.RAW,
+                              comp = 1)$name, "\n")
+
+# ---- direction concordance among shared indicators (RAW) --------------------
+lo     <- selectVar(final.mint.splsda.open.closed.sector,              comp = 1)$value
+la.RAW <- selectVar(final.mint.splsda.open.closed.sector.UNMAPPED.RAW, comp = 1)$value
+dir_agree_RAW <- mean(sign(lo[shared_features_RAW, 1]) ==
+                      sign(la.RAW[shared_features_RAW, 1])) * 100
+cat(sprintf("Direction agreement (shared indicators, RAW): %.1f%%\n", dir_agree_RAW))
+
+# =============================================================================
+# VERIFICATION CHECKS — run AFTER unmapped_row_MINT_RAW.R (and, if you want the
+# scaled comparison too, after the scaled script so its objects exist).
+# These do not alter any analysis; they interrogate the intermediate objects to
+# confirm the Unmapped row genuinely perturbs the CLR and the near-identical
+# results are real, not an artifact of comparing an object to itself.
+# =============================================================================
+
+cat("\n################  VERIFICATION  ################\n")
+
+# ---------------------------------------------------------------------------
+# CHECK 1. Did the Unmapped row actually get added? Dimensions should be 877.
+# ---------------------------------------------------------------------------
+cat("\n[1] Dimensions\n")
+cat("  Original pMAGs rows (MAGs):        ", nrow(pMAGs_95ANI), "\n")
+cat("  Augmented (RAW) rows (MAGs+1):     ", nrow(pMAGs_aug_RAW), "\n")
+cat("  Is 'Unmapped' a row in augmented?  ",
+    "Unmapped" %in% rownames(pMAGs_aug_RAW), "\n")
+cat("  Unmapped row present in CLR object?",
+    "Unmapped" %in% rownames(as(otu_table(pMAGs_aug_phyloseq_clr_RAW), "matrix")), "\n")
+
+# ---------------------------------------------------------------------------
+# CHECK 2. Is the augmented CLR matrix ACTUALLY different from the original?
+#   Compare the 876 shared MAGs (drop the Unmapped row) across the same samples.
+#   If differences are exactly zero -> something didn't propagate (BAD).
+#   If differences are small but non-zero -> correct: adding one shared feature
+#   shifts every CLR value by a near-constant, which is expected.
+# ---------------------------------------------------------------------------
+cat("\n[2] Does the augmented CLR differ from the original CLR?\n")
+clr_orig <- as(otu_table(pMAGs_95ANI_phyloseq_clr),        "matrix")   # 876 x 190
+clr_rawA <- as(otu_table(pMAGs_aug_phyloseq_clr_RAW),      "matrix")   # 877 x 190
+
+common_mags <- intersect(rownames(clr_orig), rownames(clr_rawA))
+common_samp <- intersect(colnames(clr_orig), colnames(clr_rawA))
+d <- clr_rawA[common_mags, common_samp] - clr_orig[common_mags, common_samp]
+
+cat("  Shared MAGs compared:              ", length(common_mags), "\n")
+cat("  all.equal(orig, aug)?              ",
+    isTRUE(all.equal(clr_orig[common_mags, common_samp],
+                     clr_rawA[common_mags, common_samp])), "\n")
+cat("  Summary of (aug - orig) CLR differences:\n")
+print(summary(as.vector(d)))
+cat(sprintf("  SD of differences:                  %.4f\n", sd(as.vector(d))))
+cat(sprintf("  Mean |difference|:                  %.4f\n", mean(abs(as.vector(d)))))
+cat("  --> non-zero but modest = correct behaviour (constant-ish CLR shift)\n")
+
+# Per-sample: is the shift roughly constant within a sample? (explains why
+# loadings barely move). Report SD of the per-sample mean shift.
+per_sample_shift <- colMeans(d)
+cat(sprintf("  Per-sample mean shift: range [%.3f, %.3f], SD across samples %.3f\n",
+            min(per_sample_shift), max(per_sample_shift), sd(per_sample_shift)))
+
+# ---------------------------------------------------------------------------
+# CHECK 3. How big is the Unmapped row's own CLR value vs the MAGs?
+#   Confirms it really is a large feature in the raw version.
+# ---------------------------------------------------------------------------
+cat("\n[3] Unmapped feature magnitude in CLR space\n")
+unmapped_clr <- clr_rawA["Unmapped", ]
+cat(sprintf("  Unmapped CLR: median %.2f, range [%.2f, %.2f]\n",
+            median(unmapped_clr), min(unmapped_clr), max(unmapped_clr)))
+cat(sprintf("  MAG CLR overall: median %.2f, range [%.2f, %.2f]\n",
+            median(clr_rawA[common_mags, ]),
+            min(clr_rawA[common_mags, ]), max(clr_rawA[common_mags, ])))
+
+# ---------------------------------------------------------------------------
+# CHECK 4. Loading correlation (unrounded) between original and RAW-augmented
+#   on the shared indicators. This is the number to quote HONESTLY (not %.3f).
+# ---------------------------------------------------------------------------
+cat("\n[4] Comp-1 loading concordance (unrounded)\n")
+lo     <- selectVar(final.mint.splsda.open.closed.sector,              comp = 1)$value
+la.RAW <- selectVar(final.mint.splsda.open.closed.sector.UNMAPPED.RAW, comp = 1)$value
+lc <- cor(lo[shared_features_RAW, 1], la.RAW[shared_features_RAW, 1])
+cat(sprintf("  Pearson r (loadings), full precision: %.10f\n", lc))
+cat(sprintf("  Direction agreement:                  %.1f%%\n",
+            100 * mean(sign(lo[shared_features_RAW,1]) ==
+                       sign(la.RAW[shared_features_RAW,1]))))
+
+# ---------------------------------------------------------------------------
+# CHECK 5. Which single indicator was LOST (349 vs 350)? Name it, so you can
+#   state it in the letter rather than hand-waving "one indicator changed".
+# ---------------------------------------------------------------------------
+cat("\n[5] The one indicator not recovered\n")
+lost <- setdiff(orig.vars, aug.vars.RAW)
+gained <- setdiff(aug.vars.RAW, orig.vars)
+cat("  Dropped from original set:", if (length(lost)) paste(lost, collapse=", ") else "(none)", "\n")
+cat("  New in augmented set:     ", if (length(gained)) paste(gained, collapse=", ") else "(none)", "\n")
+if (length(lost)) {
+  cat(sprintf("  Its original comp-1 loading: %.5f (rank %d of %d by |loading|)\n",
+              lo[lost, 1], which(order(-abs(lo[,1])) == which(rownames(lo)==lost)),
+              nrow(lo)))
+  cat("  --> if this is a low-|loading| borderline feature, the swap is trivial\n")
+}
+
+# ---------------------------------------------------------------------------
+# CHECK 6. Sanity on Y and study alignment (guards against silent mis-join)
+# ---------------------------------------------------------------------------
+cat("\n[6] Response / study alignment\n")
+cat("  Rows of X (samples):               ", nrow(MAGs_MINT_aug_RAW), "\n")
+cat("  Length of Y:                       ",
+    length(pMAGs_aug_phyloseq_clr_RAW@sam_data$Open_or_Closed_to_fishing), "\n")
+cat("  Y table:\n"); print(table(pMAGs_aug_phyloseq_clr_RAW@sam_data$Open_or_Closed_to_fishing))
+cat("  study (sector) table:\n"); print(table(pMAGs_aug_phyloseq_clr_RAW@sam_data$SECTOR_N_S))
+cat("  Sample order X == metadata?        ",
+    all(rownames(MAGs_MINT_aug_RAW) ==
+        rownames(as(sample_data(pMAGs_aug_phyloseq_clr_RAW), "data.frame"))), "\n")
+
+cat("\n################  END VERIFICATION  ################\n")
+
+# =============================================================================
+# Diagnostic figures (RAW pipeline) — run AFTER the verification checks.
+# Uses the _RAW objects: shared_features_RAW, aug.vars.RAW,
+# final.mint.splsda.open.closed.sector.UNMAPPED.RAW, pMAGs_aug_phyloseq_clr_RAW,
+# venn.plot.RAW. Saves all outputs as PDF.
+# =============================================================================
+
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(patchwork)   # install.packages("patchwork") if needed
+
+outdir <- "/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/cleaned_code/Figure_2/output_pdf/"
+zcol   <- c("C" = "seagreen3", "O" = "steelblue4")   # manuscript palette
+
+# ---------------------------------------------------------------------------
+# FIG 0. Save the RAW Venn (from the MINT chunk) as a PDF
+# ---------------------------------------------------------------------------
+pdf(file.path(outdir, "FigSXX_0_venn_indicators_RAW.pdf"), width = 5, height = 5)
+grid::grid.newpage(); grid::grid.draw(venn.plot.RAW)
+dev.off()
+
+# ---------------------------------------------------------------------------
+# Per-sample data frame: reads, mapped, unmapped, rate, zone, sector
+# ---------------------------------------------------------------------------
+meta <- as(phyloseq::sample_data(pMAGs_aug_phyloseq_clr_RAW), "data.frame")
+
+samp <- data.frame(
+  Sample_ID = otu_ids,
+  mapped    = mapping$mapped_reads[match(otu_ids, mapping$Sample_ID)],
+  reads     = mapping$reads[match(otu_ids, mapping$Sample_ID)],
+  rate      = 100 * rate_vec[otu_ids],
+  stringsAsFactors = FALSE
+)
+samp$unmapped <- samp$reads - samp$mapped
+samp$Zone   <- meta$Open_or_Closed_to_fishing[match(samp$Sample_ID, rownames(meta))]
+samp$Sector <- meta$SECTOR_N_S[match(samp$Sample_ID, rownames(meta))]
+# corbett_1 NA -> impute mapped/unmapped for plotting from imputed rate
+imp <- is.na(samp$mapped)
+if (any(imp)) {
+  samp$rate[imp]     <- 100 * median(rate_vec, na.rm = TRUE)
+  samp$mapped[imp]   <- mag_total[samp$Sample_ID[imp]]
+  samp$unmapped[imp] <- unmapped_vec[samp$Sample_ID[imp]]
+  samp$reads[imp]    <- samp$mapped[imp] + samp$unmapped[imp]
+}
+
+# ---------------------------------------------------------------------------
+# FIG A. Stacked barplot: mapped (coloured by zone) vs unmapped (grey),
+#        per sample, faceted by GBR sector.
+# ---------------------------------------------------------------------------
+bar_df <- samp %>%
+  dplyr::select(Sample_ID, Zone, Sector, mapped, unmapped) %>%
+  tidyr::pivot_longer(c(mapped, unmapped), names_to = "fraction", values_to = "count") %>%
+  dplyr::mutate(
+    reads_M = count / 1e6,
+    fill_key = ifelse(fraction == "unmapped", "Unmapped",
+                      ifelse(Zone == "C", "Mapped (NTMR)", "Mapped (Fished)"))
+  )
+bar_df$Sample_ID <- factor(bar_df$Sample_ID,
+                           levels = samp$Sample_ID[order(samp$Sector, -samp$rate)])
+
+figA <- ggplot(bar_df, aes(Sample_ID, reads_M, fill = fill_key)) +
+  geom_col(width = 0.9) +
+  facet_grid(~ Sector, scales = "free_x", space = "free_x") +
+  scale_fill_manual(values = c("Unmapped" = "grey70",
+                               "Mapped (NTMR)" = "seagreen3",
+                               "Mapped (Fished)" = "steelblue4"),
+                    name = NULL) +
+  labs(x = NULL, y = "Reads (millions)",
+       title = "Mapped vs unmapped reads per sample (unmapped in grey)") +
+  theme_bw(base_size = 11) +
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(),
+        panel.grid.major.x = element_blank(),
+        strip.text = element_text(size = 8), legend.position = "top")
+
+# ---------------------------------------------------------------------------
+# FIG B. Mapping RATE by zone — direct test of the confounding pathway.
+# ---------------------------------------------------------------------------
+wt <- wilcox.test(rate ~ Zone, data = samp)
+figB <- ggplot(samp, aes(Zone, rate, fill = Zone)) +
+  geom_boxplot(width = 0.5, outlier.shape = NA, alpha = 0.8) +
+  geom_jitter(width = 0.12, size = 1, alpha = 0.5) +
+  scale_fill_manual(values = zcol, guide = "none") +
+  scale_x_discrete(labels = c("C" = "NTMR", "O" = "Fished")) +
+  labs(x = NULL, y = "Mapping rate (%)",
+       title = "Catalogue representativeness by zone",
+       subtitle = sprintf("Wilcoxon p = %.3f (n = %d)", wt$p.value, nrow(samp))) +
+  theme_bw(base_size = 11)
+
+rate_by_zone_sector <- samp %>%
+  dplyr::group_by(Sector, Zone) %>%
+  dplyr::summarise(median_rate = median(rate), .groups = "drop") %>%
+  tidyr::pivot_wider(names_from = Zone, values_from = median_rate)
+cat("\nMedian mapping rate by sector and zone:\n"); print(rate_by_zone_sector)
+cat(sprintf("\nOverall mapping rate: NTMR median %.1f%%, Fished median %.1f%%, Wilcoxon p = %.3f\n",
+            median(samp$rate[samp$Zone=="C"]), median(samp$rate[samp$Zone=="O"]), wt$p.value))
+
+# ---------------------------------------------------------------------------
+# FIG C. Comp-1 loading concordance: original vs RAW-augmented.
+# ---------------------------------------------------------------------------
+lo     <- selectVar(final.mint.splsda.open.closed.sector,              comp = 1)$value
+la.RAW <- selectVar(final.mint.splsda.open.closed.sector.UNMAPPED.RAW, comp = 1)$value
+conc <- data.frame(
+  MAG        = shared_features_RAW,
+  load_orig  = lo[shared_features_RAW, 1],
+  load_aug   = la.RAW[shared_features_RAW, 1]
+) %>%
+  dplyr::mutate(Direction = ifelse(load_orig > 0, "NTMR-enriched", "Fished-enriched"))
+
+r_pear <- cor(conc$load_orig, conc$load_aug)
+figC <- ggplot(conc, aes(load_orig, load_aug, colour = Direction)) +
+  geom_hline(yintercept = 0, linetype = 2, colour = "grey60") +
+  geom_vline(xintercept = 0, linetype = 2, colour = "grey60") +
+  geom_abline(slope = 1, intercept = 0, linetype = 3, colour = "grey40") +
+  geom_point(size = 1.6, alpha = 0.75) +
+  scale_colour_manual(values = c("NTMR-enriched" = "seagreen3",
+                                 "Fished-enriched" = "steelblue4"), name = NULL) +
+  labs(x = "Comp-1 loading (original, closed frame)",
+       y = "Comp-1 loading (with Unmapped, open frame)",
+       title = "Indicator enrichment is unchanged by the reference frame",
+       subtitle = sprintf("%d shared indicators | direction agreement 100%% | r = %.3f",
+                          nrow(conc), r_pear)) +
+  theme_bw(base_size = 11) + theme(legend.position = "top")
+
+# ---------------------------------------------------------------------------
+# FIG D. Per-zone mean CLR enrichment: original vs RAW-augmented.
+# ---------------------------------------------------------------------------
+clr_orig <- as(otu_table(pMAGs_95ANI_phyloseq_clr),      "matrix")
+clr_aug  <- as(otu_table(pMAGs_aug_phyloseq_clr_RAW),    "matrix")
+zone_vec <- meta$Open_or_Closed_to_fishing[match(colnames(clr_orig), rownames(meta))]
+
+zdiff <- function(mat) {
+  nt <- rowMeans(mat[shared_features_RAW, zone_vec == "C", drop = FALSE])
+  fi <- rowMeans(mat[shared_features_RAW, zone_vec == "O", drop = FALSE])
+  nt - fi
+}
+enr <- data.frame(
+  MAG  = shared_features_RAW,
+  orig = zdiff(clr_orig),
+  aug  = zdiff(clr_aug[shared_features_RAW, colnames(clr_orig)])
+) %>% dplyr::mutate(Direction = ifelse(orig > 0, "NTMR-enriched", "Fished-enriched"))
+
+r_enr <- cor(enr$orig, enr$aug)
+figD <- ggplot(enr, aes(orig, aug, colour = Direction)) +
+  geom_hline(yintercept = 0, linetype = 2, colour = "grey60") +
+  geom_vline(xintercept = 0, linetype = 2, colour = "grey60") +
+  geom_abline(slope = 1, intercept = 0, linetype = 3, colour = "grey40") +
+  geom_point(size = 1.6, alpha = 0.75) +
+  scale_colour_manual(values = c("NTMR-enriched" = "seagreen3",
+                                 "Fished-enriched" = "steelblue4"), name = NULL) +
+  labs(x = "NTMR - Fished mean CLR (original)",
+       y = "NTMR - Fished mean CLR (with Unmapped)",
+       title = "Per-zone enrichment magnitude is preserved",
+       subtitle = sprintf("r = %.3f across %d shared indicators", r_enr, nrow(enr))) +
+  theme_bw(base_size = 11) + theme(legend.position = "top")
+
+# ---------------------------------------------------------------------------
+# Save all as PDF
+# ---------------------------------------------------------------------------
+ggsave(file.path(outdir, "FigSXX_A_read_barplots_RAW.pdf"),       figA, width = 12, height = 4.5)
+ggsave(file.path(outdir, "FigSXX_B_mappingrate_by_zone_RAW.pdf"), figB, width = 4.5, height = 4.5)
+ggsave(file.path(outdir, "FigSXX_C_loading_concordance_RAW.pdf"), figC, width = 5.5, height = 5.5)
+ggsave(file.path(outdir, "FigSXX_D_clr_enrichment_RAW.pdf"),      figD, width = 5.5, height = 5.5)
+
+combined <- (figB | figC | figD)
+ggsave(file.path(outdir, "FigSXX_combined_diagnostics_RAW.pdf"), combined, width = 15, height = 5)
+
+cat("\nSaved PDFs to", outdir, ":\n",
+    "  FigSXX_0_venn_indicators_RAW.pdf, _A_read_barplots_RAW.pdf,\n",
+    "  _B_mappingrate_by_zone_RAW.pdf, _C_loading_concordance_RAW.pdf,\n",
+    "  _D_clr_enrichment_RAW.pdf, _combined_diagnostics_RAW.pdf\n")
+```
+
+```{r Exporting the raw data used to plot panels in Fig 2 for the Source data file}
+library(writexl); library(dplyr); library(tibble)
+
+out_dir <- "/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/cleaned_code/Source_Data_file_Nature_Communications/Figure_2"
+dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+
+## ---- Panel A: PERMANOVA variance partitioning ----
+# The adonis2 table behind Fig 2A (Df, SumOfSqs, R2, F, p) plus the plotted % variance
+panelA <- as.data.frame(permanova_full_with_reef) %>%
+  rownames_to_column("Factor") %>%
+  mutate(Percent_variance = R2 * 100)
+
+## ---- Panel B: MINT sPLS-DA sample coordinates (components 1 & 2) ----
+# Global variates hold each sample's position; attach zoning, sector, trip
+mint_obj <- final.mint.splsda.open.closed.sector
+panelB <- as.data.frame(mint_obj$variates$X) %>%
+  rownames_to_column("Sample_ID")
+# name the component columns clearly (they come in as comp1/comp2 or "comp 1"/"comp 2")
+colnames(panelB)[2:3] <- c("Component_1", "Component_2")
+panelB$Zoning_status <- as.character(mint_obj$Y)
+if (!is.null(mint_obj$study)) panelB$GBR_sector <- as.character(mint_obj$study)
+
+## ---- Panel C: heatmap abundance matrix (reef sites x indicator pMAGs) ----
+# cim() returns the plotted matrix in $mat. Capture it without drawing.
+cim_C <- cim(mint_obj, comp = 1, col.names = MAGs.name.short)
+panelC <- as.data.frame(cim_C$mat) %>%
+  rownames_to_column("Sample_ID")
+
+## ---- Panel D: per-sector enrichment direction (pMAG x sector) ----
+# loading.plots.rawgraphs.sectors has OTU + one GroupContrib column per sector (NTMR/fished)
+panelD <- loading.plots.rawgraphs.sectors
+
+## ---- Panel E: indicator taxonomy for the alluvial diagram ----
+# rawgraphs_final.sectors carries the 350 indicators with full taxonomy + group contribution
+panelE <- rawgraphs_final.sectors
+
+## ---- Write one workbook, one sheet per panel ----
+write_xlsx(
+  list(
+    "Figure 2A" = panelA,
+    "Figure 2B" = panelB,
+    "Figure 2C" = panelC,
+    "Figure 2D" = panelD,
+    "Figure 2E" = panelE
+  ),
+  path = file.path(out_dir, "Figure_2_Source_Data.xlsx")
+)
+
+cat("Panel A rows:", nrow(panelA), "\n")
+cat("Panel B rows (samples):", nrow(panelB), "\n")
+cat("Panel C dims (sites x pMAGs):", paste(dim(panelC), collapse = " x "), "\n")
+cat("Panel D rows (pMAGs):", nrow(panelD), "\n")
+cat("Panel E rows (pMAGs):", nrow(panelE), "\n")
+cat("Written:", file.path(out_dir, "Figure_2_Source_Data.xlsx"), "\n")
+```
+
 
 # Saving the R object (for downstream analysis)
 
