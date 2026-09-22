@@ -3372,7 +3372,146 @@ summary(lm(connectedness.neg ~ average_KEGG_completeness_per_MAG,
           data = MINT_sPLS_CheckM_stats_and_average_KEGG_completeness_and_connectedness))
 ```
 
+```{r Boxplots wilcoxon tests, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, results='hide', fig.show='hide'}
+library(dplyr); library(knitr); library(rstatix)
+
+# ---- Helper: two-sided Wilcoxon rank-sum test + effect size (same for every panel) ----
+f4_wilcox <- function(data, response, group, panel_label) {
+  form <- as.formula(paste0("`", response, "` ~ ", group))
+  test <- data %>% rstatix::pairwise_wilcox_test(form, detailed = TRUE)
+  eff  <- data %>% rstatix::wilcox_effsize(form)
+  data.frame(panel = panel_label, n1 = test$n1, n2 = test$n2,
+             W = test$statistic, p_exact = test$p,
+             conf_low = test$conf.low, conf_high = test$conf.high,
+             effsize_r = round(eff$effsize, 3),
+             magnitude = as.character(eff$magnitude), stringsAsFactors = FALSE)
+}
+
+# ---- Panel I data (cohesion) with zoning joined on ----
+coh_I_df <- left_join(
+  cohesion_to_viz,
+  sample_data(pMAGs_95ANI_phyloseq_clr) %>% as.data.frame(),
+  by = "Sample_ID"
+)
+
+# ---- Panel J data (modularity) from the network-analysis output ----
+# Adjust the path if your working directory differs
+modularity_df <- read.csv("/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/Network_analysis_modularity/results/modularity/binary_modularity_hernandez.csv")
+
+# ---- Run all seven panels through the identical helper ----
+f4_stats <- bind_rows(
+  f4_wilcox(MINT_sPLS_CheckM_stats,                              "Genome.size..bp..CheckM1",         "Overall_GroupContrib",      "B_GenomeSize"),
+  f4_wilcox(MINT_sPLS_CheckM_stats,                              "GC.CheckM1",                       "Overall_GroupContrib",      "D_GCcontent"),
+  f4_wilcox(MINT_sPLS_CheckM_stats_and_average_KEGG_completeness,"average_KEGG_completeness_per_MAG", "Overall_GroupContrib",      "F_KEGGcomplete"),
+  f4_wilcox(pMAGs_connectedness.MINT_sPLS_indicators,            "Connectedness_Ratio_pos_neg",      "Overall_GroupContrib",      "H_Connectedness"),
+  f4_wilcox(coh_I_df,                                            "Ratio_pos_neg",                    "Open_or_Closed_to_fishing", "I_Cohesion"),
+  f4_wilcox(modularity_df,                                       "modularity",                       "zone",                      "J_Modularity"),
+  f4_wilcox(megan_genus_shannon_boxplots,                        "MAGs_shannon",                     "Open_or_Closed_to_fishing", "K_Shannon")
+) %>%
+  mutate(
+    p_reported = ifelse(p_exact < 2.2e-16, "< 2.2e-16",
+                        format(p_exact, scientific = TRUE, digits = 3)),
+    significance = cut(p_exact,
+                       breaks = c(-Inf, 0.0001, 0.001, 0.01, 0.05, Inf),
+                       labels = c("****", "***", "**", "*", "ns"),
+                       right = FALSE)
+  )
+
+kable(f4_stats[, c("panel","n1","n2","W","p_reported","significance","effsize_r","magnitude","conf_low","conf_high")],
+      col.names = c("Panel","n grp1","n grp2","W","p-value","Signif.","Effect r","Magnitude","CI low","CI high"),
+      caption = "Figure 4 — two-sided Wilcoxon rank-sum test results")
+```
+
 Yes, the result is significant in all instances, although R squared values are low, suggesting a small (albeit significant) effect.
+
+```{r Exporting the relevant raw data to generate panels in Fig 4 to use in the Source Data file}
+library(writexl); library(dplyr); library(tibble)
+
+out_dir <- "/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/cleaned_code/Source_Data_file_Nature_Communications/Figure_4"
+dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+
+zone_lab <- function(x) dplyr::recode(as.character(x),
+                                      "C" = "NTMR", "O" = "Fished",
+                                      "NTMR" = "NTMR", "Fished" = "Fished",
+                                      .default = as.character(x))
+
+## ============================================================
+## SHEET 1 — Panels A–H: all pMAG-specific metrics (350 rows)
+##   A/B genome size, C/D GC content, E/F KEGG completeness,
+##   G/H connectedness (raw pos/neg + plotted ratio)
+## ============================================================
+# genome size + GC from the CheckM stats table
+genomic <- MINT_sPLS_CheckM_stats %>%
+  dplyr::select(OTU, Overall_GroupContrib,
+                Genome_size_bp = Genome.size..bp..CheckM1,
+                GC_content_percent = GC.CheckM1)
+
+# KEGG completeness (join by OTU)
+kegg <- MINT_sPLS_CheckM_stats_and_average_KEGG_completeness %>%
+  dplyr::select(OTU, average_KEGG_completeness_per_MAG)
+
+# connectedness (join by OTU) — keep raw pos/neg and the ratio
+conn <- pMAGs_connectedness.MINT_sPLS_indicators %>%
+  dplyr::select(OTU,
+                Positive_connectedness = connectedness.pos,
+                Negative_connectedness = connectedness.neg,
+                Connectedness_Ratio_pos_neg)
+
+fig4_AH <- genomic %>%
+  left_join(kegg, by = "OTU") %>%
+  left_join(conn, by = "OTU") %>%
+  dplyr::rename(Zone = Overall_GroupContrib) %>%
+  dplyr::relocate(Zone, .after = OTU)
+
+## ============================================================
+## SHEET 2 — Panels I & K: sample-specific metrics (190 rows)
+##   I cohesion (pos/neg + ratio), K Shannon diversity
+## ============================================================
+coh <- coh_I_df %>%
+  dplyr::select(Sample_ID,
+                Open_or_Closed_to_fishing,
+                Positive_cohesion, Negative_cohesion,
+                Cohesion_Ratio_pos_neg = Ratio_pos_neg)
+
+shan <- megan_genus_shannon_boxplots %>%
+  dplyr::select(Sample_ID, MAGs_shannon)
+
+fig4_IK <- coh %>%
+  left_join(shan, by = "Sample_ID") %>%
+  mutate(Zone = zone_lab(Open_or_Closed_to_fishing)) %>%
+  dplyr::select(Sample_ID, Zone,
+                Positive_cohesion, Negative_cohesion, Cohesion_Ratio_pos_neg,
+                Shannon_diversity = MAGs_shannon)
+
+## ============================================================
+## SHEET 3 — Panel J: modularity per sector x zone network (14 rows)
+## ============================================================
+fig4_J <- modularity_df
+
+## ============================================================
+## SHEET 4 — Statistics (the f4_stats table for all panels)
+## ============================================================
+fig4_stats_sheet <- f4_stats %>%
+  dplyr::select(panel, n1, n2, W, p_exact, p_reported, significance,
+                effsize_r, magnitude, conf_low, conf_high)
+
+## ---- Write workbook ----
+write_xlsx(
+  list(
+    "Fig 4A-H (per pMAG)"    = fig4_AH,
+    "Fig 4I,K (per sample)"  = fig4_IK,
+    "Fig 4J (per network)"   = fig4_J,
+    "Fig 4 statistics"       = fig4_stats_sheet
+  ),
+  path = file.path(out_dir, "Figure_4_Source_Data.xlsx")
+)
+
+cat("Sheet 1 A-H rows (should be 350):", nrow(fig4_AH), "\n")
+cat("Sheet 2 I,K rows (should be 190):", nrow(fig4_IK), "\n")
+cat("Sheet 3 J rows (should be 14):", nrow(fig4_J), "\n")
+cat("Written:", file.path(out_dir, "Figure_4_Source_Data.xlsx"), "\n")
+```
+
 
 # Saving the R object (for downstream analysis)
 
