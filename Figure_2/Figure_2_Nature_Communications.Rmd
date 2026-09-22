@@ -6102,6 +6102,172 @@ cat("Panel E rows (pMAGs):", nrow(panelE), "\n")
 cat("Written:", file.path(out_dir, "Figure_2_Source_Data.xlsx"), "\n")
 ```
 
+```{r Source Data Supplementary Figures}
+### PCA - Figs S1-2
+library(writexl); library(tibble)
+
+out_dir <- "/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/cleaned_code/Source_Data_file_Nature_Communications/Supplementary"
+dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+
+# PCA sample scores (same coordinates for both S1 and S2)
+figS1_S2 <- as.data.frame(result.pca$variates$X) %>%
+  rownames_to_column("Sample_ID")
+
+# rename component columns PC1, PC2, ...
+comp_cols <- setdiff(colnames(figS1_S2), "Sample_ID")
+colnames(figS1_S2)[match(comp_cols, colnames(figS1_S2))] <- paste0("PC", seq_along(comp_cols))
+
+# annotation vectors pulled exactly as the PCA plots did (same sample order as the scores)
+figS1_S2$Sampling_trip  <- sample_data(pMAGs_95ANI_phyloseq_clr)$Sampling_trip
+figS1_S2$Zoning_status  <- sample_data(pMAGs_95ANI_phyloseq_clr)$Open_or_Closed_to_fishing
+figS1_S2$GBR_sector     <- sample_data(pMAGs_95ANI_phyloseq_clr)$SECTOR
+
+# make zoning human-readable (as in the S2 legend)
+figS1_S2$Zoning_status <- ifelse(figS1_S2$Zoning_status == "C", "NTMR (closed)",
+                          ifelse(figS1_S2$Zoning_status == "O", "Fished (open)",
+                                 figS1_S2$Zoning_status))
+
+# % variance explained per component (axis labels)
+pca_var <- data.frame(
+  Component = paste0("PC", seq_along(result.pca$prop_expl_var$X)),
+  Prop_variance_explained = as.numeric(result.pca$prop_expl_var$X)
+)
+
+write_xlsx(
+  list(
+    "Fig S1-S2 PCA scores" = figS1_S2,
+    "Fig S1-S2 variance"   = pca_var
+  ),
+  path = file.path(out_dir, "Figure_S1_S2_Source_Data.xlsx")
+)
+
+cat("Rows (samples, should be 190):", nrow(figS1_S2), "\n")
+cat("Written:", file.path(out_dir, "Figure_S1_S2_Source_Data.xlsx"), "\n")
+
+### dbRDA - Fig S4
+## ---- S4 Left: dbRDA site (sample) scores on the constrained axes ----
+# Same scores the ordiplot/points() call used, coloured by zoning
+dbrda_sites <- as.data.frame(vegan::scores(dbrda_result, display = "sites",
+                                           choices = 1:ncol(dbrda_result$CCA$u))) %>%
+  rownames_to_column("Sample_ID")
+
+# annotation exactly as the plot did (metadata_permanova is row-aligned to the scores)
+dbrda_sites$Zoning_status <- ifelse(metadata_permanova$Open_or_Closed_to_fishing == "C",
+                                    "NTMR (closed)", "Fished (open)")
+dbrda_sites$Sampling_trip <- metadata_permanova$Sampling_trip
+dbrda_sites$GBR_sector    <- metadata_permanova$SECTOR_N_S
+
+## ---- S4 Right: % constrained variance per dbRDA axis (the barplot) ----
+eig <- dbrda_result$CCA$eig
+dbrda_axis_variance <- data.frame(
+  dbRDA_axis = paste0("dbRDA", seq_along(eig)),
+  Eigenvalue = as.numeric(eig),
+  Percent_of_constrained_variance = 100 * as.numeric(eig) / sum(eig),
+  Percent_of_total_variance = 100 * as.numeric(eig) / dbrda_result$tot.chi
+)
+
+write_xlsx(
+  list(
+    "Fig S4 dbRDA site scores" = dbrda_sites,
+    "Fig S4 axis variance"     = dbrda_axis_variance
+  ),
+  path = file.path(out_dir, "Figure_S4_Source_Data.xlsx")
+)
+
+cat("Fig S4 site scores rows (should be 190):", nrow(dbrda_sites), "\n")
+cat("Fig S4 constrained axes:", nrow(dbrda_axis_variance), "\n")
+cat("Written:", file.path(out_dir, "Figure_S4_Source_Data.xlsx"), "\n")
+
+trip_vec  <- sample_data(pMAGs_95ANI_phyloseq_clr)$Sampling_trip
+zone_vec  <- sample_data(pMAGs_95ANI_phyloseq_clr)$Open_or_Closed_to_fishing
+zone_lab  <- ifelse(zone_vec == "C", "NTMR (closed)",
+             ifelse(zone_vec == "O", "Fished (open)", as.character(zone_vec)))
+
+## ---- S5: PLS-DA tuning — error rate per component per prediction distance ----
+# perf() stores error rates in $error.rate (overall + BER) with SD in $error.rate.sd
+s5_err <- as.data.frame(perf.plsda.open.closed$error.rate$overall) %>%
+  rownames_to_column("Component"); colnames(s5_err) <- paste0(colnames(s5_err), "_overall")
+s5_ber <- as.data.frame(perf.plsda.open.closed$error.rate$BER) %>%
+  rownames_to_column("Component"); colnames(s5_ber) <- paste0(colnames(s5_ber), "_BER")
+figS5 <- cbind(s5_err, s5_ber[,-1])
+
+## ---- S6: PLS-DA sample coordinates (components 1 & 2), annotated by zoning + trip ----
+figS6 <- as.data.frame(final.plsda.open.closed$variates$X) %>%
+  rownames_to_column("Sample_ID")
+colnames(figS6)[2:3] <- c("Component_1", "Component_2")
+figS6$Zoning_status <- zone_lab
+figS6$Sampling_trip <- trip_vec
+
+## ---- S8: sPLS-DA sample coordinates (components 1 & 2), annotated by zoning + trip ----
+figS8 <- as.data.frame(final.splsda.open.closed$variates$X) %>%
+  rownames_to_column("Sample_ID")
+colnames(figS8)[2:3] <- c("Component_1", "Component_2")
+figS8$Zoning_status <- zone_lab
+figS8$Sampling_trip <- trip_vec
+
+## ---- S9: sPLS-DA CIM abundance matrix (sites x selected indicator pMAGs) ----
+cim_S9 <- cim(final.splsda.open.closed, comp = 1:2, col.names = MAGs.name.short)
+figS9 <- as.data.frame(cim_S9$mat) %>%
+  rownames_to_column("Reef_site")
+
+write_xlsx(
+  list(
+    "Fig S5 PLS-DA tuning" = figS5,
+    "Fig S6 PLS-DA scores" = figS6,
+    "Fig S8 sPLS-DA scores" = figS8,
+    "Fig S9 sPLS-DA heatmap" = figS9
+  ),
+  path = file.path(out_dir, "Figure_S5_S6_S8_S9_Source_Data.xlsx")
+)
+
+cat("S5 rows (components):", nrow(figS5), "\n")
+cat("S6 rows (samples, ~190):", nrow(figS6), "\n")
+cat("S8 rows (samples, ~190):", nrow(figS8), "\n")
+cat("S9 dims (sites x pMAGs):", paste(dim(figS9), collapse = " x "), "\n")
+cat("Written:", file.path(out_dir, "Figure_S5_S6_S8_S9_Source_Data.xlsx"), "\n")
+
+### MINT
+## ---- S10 / Tables S3-S4: component tuning error rates (clear column names) ----
+ov  <- as.data.frame(perf.mint.splsda.open.closed.sector$global.error$overall)
+ber <- as.data.frame(perf.mint.splsda.open.closed.sector$global.error$BER)
+colnames(ov)  <- paste0(colnames(ov),  "_overall")
+colnames(ber) <- paste0(colnames(ber), "_BER")
+s10 <- cbind(Component = seq_len(nrow(ov)), ov, ber)
+
+## ---- S11 / Table S5: keepX tuning error rates ----
+s11 <- as.data.frame(tune.mint.splsda.open.closed.sector$error.rate) %>%
+  rownames_to_column("keepX_value")
+
+## ---- S13: ROC source = per-sample component-1 scores + true label (+ AUC noted) ----
+mint <- final.mint.splsda.open.closed.sector
+auc_val <- MINT_sPLS_da_open_closed_model_performance.sectors$Comp1[1, "AUC"]
+
+s13 <- data.frame(
+  Sample_ID     = rownames(mint$variates$X),
+  MINT_comp1_score = mint$variates$X[, 1],
+  True_zoning   = ifelse(metadata_IMOS_MGD_MAGs$Open_or_Closed_to_fishing == "C",
+                         "NTMR (closed)", "Fished (open)"),
+  stringsAsFactors = FALSE
+)
+# record the AUC once (same value repeated is fine; it's a single model-level statistic)
+s13$AUC_component1 <- as.numeric(auc_val)
+
+write_xlsx(
+  list(
+    "Fig S10 (=Tables S3-S4)" = s10,
+    "Fig S11 (=Table S5)"     = s11,
+    "Fig S13 ROC"             = s13
+  ),
+  path = file.path(out_dir, "Figure_S10-S13_Source_Data.xlsx")
+)
+
+cat("S10 rows (components):", nrow(s10), "\n")
+cat("S11 rows (keepX values):", nrow(s11), "\n")
+cat("S13 rows (samples for ROC):", nrow(s13), "\n")
+cat("S13 AUC (component 1):", round(as.numeric(auc_val), 4), "\n")
+cat("Written:", file.path(out_dir, "Figure_S10-S13_Source_Data.xlsx"), "\n")
+```
+
 
 # Saving the R object (for downstream analysis)
 
