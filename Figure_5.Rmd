@@ -1,0 +1,1789 @@
+
+---
+title: "Figure 5"
+subtitle: "R code to replicate the analysis"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+documentclass: article
+mainfont: Lato
+output:
+  html_document:
+    code_folding: show
+    collapse: no
+    df_print: paged
+    fig_caption: yes
+    fig_height: 4
+    fig_width: 4
+    highlight: textmate
+    theme: united
+    toc: yes
+    toc_float: yes
+    css: "/home/marko-terzin/Documents/PhD/Thesis/Chapter_2/Data_analysis/Seawater/testing_Igor_Antti_R_script/All_seawater_full_dataset/resources/ws_style.css"  
+  pdf_document:
+    toc: yes
+    toc_depth: 3
+    number_sections: yes
+    df_print: kable
+    fig_caption: true
+    highlight: zenburn
+    latex_engine: xelatex 
+  word_document:
+#    fig_caption: yes
+#    fig_height: 4
+#    fig_width: 4
+#    highlight: tango
+    toc: yes
+#    toc_depth: 2  
+# bibliography: ../resources/references.bib
+fontsize: 11pt
+geometry: margin=1in
+classoption: a4paper
+abstract: This is the code to make Fig. 4 (and all the relevant supplementary figures/tables). 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r Loading libraries, results = "hide", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# First checking if I have the packages I need, and installing if not
+list.of.packages <- c("tidyverse", "gplots", "RColorBrewer", "networkD3", "vegan", "rstatix", 
+                      "ggalluvial", "gridExtra", "propr", "patchwork", "phyloseq", "dplyr", 
+                      "VennDiagram", "plyr", "data.table", "vsn", "pheatmap", "ggpubr", 
+                      "microbiome", "rmarkdown", "mixOmics", "NetCoMi", "igraph", "randomForest", 
+                      "caret", "pdp", "rstatix")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+
+# Installing some separately:
+# phyloseq
+# if (!requireNamespace("BiocManager", quietly = TRUE))
+# install.packages("BiocManager")
+
+# BiocManager::install("phyloseq")
+
+# DESeq2
+# BiocManager::install("DESeq2")
+
+# vsn
+# BiocManager::install("vsn")
+
+# Had issues installing tidyverse, so I followed this first (insttalled some dependencies from the terminal) and then it worked: https://community.rstudio.com/t/tidyverse-package-does-not-install/162507/6
+library(tidyverse)
+library(gplots)
+library(RColorBrewer)
+library(kableExtra)
+library(ggrepel)
+library(units)
+library(future) # Needed to use multiple processors
+library(furrr) # Needed to use multiple processors
+library(progressr) # to track the progress
+library(networkD3) # for Sankey diagrams
+library(vegan)
+library(rstatix)
+library(parallel) # for setting multiple CPUs
+library(ggalluvial) # to create alluvial diagrams
+library(gridExtra)
+# library(propr) # to compute the proportionality metric!
+library(patchwork)
+library(phyloseq)
+library(ggnewscale)
+library(dplyr)
+library(VennDiagram)
+# if (!require(devtools)) install.packages("devtools")
+# devtools::install_github("gaospecial/ggVennDiagram")
+library(ggVennDiagram)
+library(ggvenn)
+library(plyr) # Needed for the ordination plots I did on my own
+library(data.table) # For data wrangling
+library(vsn) # For normalization
+# library(psych) # Used to investigate correlations among predictors in RDA analysis, ran in vegan
+library(RColorBrewer)
+library(pheatmap)
+library(ggpubr) # has ggarrange
+# EcolUtils by Guillem Salazar
+library(devtools)
+# devtools::install_github("GuillemSalazar/EcolUtils")
+# library(EcolUtils)
+# Install pairwiseAdonis
+# devtools::install_github("pmartinezarbizu/pairwiseAdonis/pairwiseAdonis")
+library(pairwiseAdonis)
+# install.packages("remotes")
+# remotes::install_github("microbiome/microbiome")
+# library(microbiome)
+# install.packages("rmarkdown")
+library(rmarkdown)
+library(mixOmics)
+# Installing the most important package - mixOmics!
+# Install mixOmics
+# BiocManager::install('mixOmics')
+# library(pairwiseAdonis)
+
+# Installing the NetCoMi package I will need for microbial networks: https://github.com/stefpeschel/NetCoMi
+# install.packages("devtools")
+# install.packages("BiocManager")
+library(doParallel)
+library(foreach)
+# Install NetCoMi
+# devtools::install_github("stefpeschel/NetCoMi", 
+#                         dependencies = c("Depends", "Imports", "LinkingTo"),
+#                         repos = c("https://cloud.r-project.org/",
+#                                   BiocManager::repositories()))
+# library(NetCoMi)
+# library(igraph) # needed for the function below: read_graph
+# Now installing propr - to compute proportionality metric (microbial networks)
+# devtools::install_github("tpq/propr")
+# library(propr)
+
+# For random forest models:
+library(randomForest)
+library(caret)  # For data splitting and model evaluation
+library(pdp)
+
+# Packages I need for the map:
+library(reshape2) # This is only needed for the melt funtion
+library(reshape)
+library(dplyr)
+library(plyr)
+library(data.table)
+library(ggplot2)
+library(rworldmap)
+library(rworldxtra)
+# library(ggsn)
+library(sf)
+library(raster)
+library(terra)
+# library(rgeos)
+# library(maps)
+# library(maptools)
+library(grid)
+library(miscTools)
+library(stringr)
+library(ggpubr)
+library(plyr)
+library(gridExtra) # for arranging plots
+
+# Loading all the libraries
+library(raster)
+library(phyloseq)
+library(tidyverse)
+library(ggspatial)
+library(ggrepel) # The package ggrepel offers a very flexible approach to deal with label placement (with geom_text_repel and 
+# geom_label_repel), including automated movement of labels in case of overlap
+# Installing AIMS packages individually
+library(remotes) # Needed to install the AIMS R packages below
+# remotes::install_github("https://github.com/open-AIMS/dataaimsr")
+library(dataaimsr)
+# remotes::install_github("https://github.com/open-AIMS/gisaimsr")
+library(gisaimsr)
+library(sp)
+
+# Importing the R object
+load("/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/cleaned_code/Figure_4/Figure_4.RData")
+
+# Setting the work directory
+setwd("/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/cleaned_code/Figure_5/")
+```
+
+```{r Specifying where I want my figures to go}
+# Define the output directory (absolute path) and make sure it exists
+output_dir <- "/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/cleaned_code/Figure_5/"
+dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+
+# Make knitr treat this as the root dir for ALL chunks (persists, unlike setwd)
+knitr::opts_knit$set(root.dir = output_dir)
+
+# Also send knitted figure files here (optional: if you want the auto-generated figure PNGs saved)
+knitr::opts_chunk$set(
+  fig.path = file.path(output_dir, "knitted_figures/")
+)
+```
+
+<!-- ===== PREREQUISITE BUILDERS (moved up from lines 16723 & 16745 of the original; code unchanged) ===== -->
+
+```{r Nitrogen related KEGGs for the 160 indicator taxa, fig.height=30, fig.width=100, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# Importing our KEGG annotations 
+KEGGs_all_876_95ANI_MAGs <- read.delim("/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/KEGGs_analysis/KEGGs_for_876_MAGs_95ANI_CoverM_Katherine.txt")
+# Adding the GTDB R214 taxonomy:
+# Remove 'IMOS__' prefix from 'genome_name' column
+KEGGs_all_876_95ANI_MAGs$genome_name <- sub('^IMOS__', '', KEGGs_all_876_95ANI_MAGs$genome_name)
+# Remove 'prok_' prefix from 'genome_name' column
+KEGGs_all_876_95ANI_MAGs$genome_name <- sub('prok__', '', KEGGs_all_876_95ANI_MAGs$genome_name)
+
+KEGGs_all_876_95ANI_MAGs_GTDB <- left_join(KEGGs_all_876_95ANI_MAGs, 
+                                           pMAGs_95ANI_phyloseq_CLR_per_sector@tax_table %>% 
+                                             as.data.frame() %>% 
+                                             rownames_to_column("genome_name")
+                                           ) %>% 
+  tidyr::unite(GTDB_taxonomy, Domain, Phylum, Class, Order, Family, Genus, Species, sep = "; ")
+
+# Only selecting the MINT sPLS-DA indicator MAGs
+KEGG_indicators <- left_join(loading.plots.rawgraphs.sectors, KEGGs_all_876_95ANI_MAGs_GTDB,
+                              by = c("OTU" = "genome_name")
+)
+```
+
+```{r Test visualisation, fig.height=70, fig.width=80, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# Assume your data frame is named df
+# Pivot data to have module_name as columns and stepwise_module_completeness as values
+heatmap_data <- KEGG_indicators %>%
+  dplyr::select(OTU, GTDB_taxonomy, module_name, stepwise_module_completeness) %>%
+  pivot_wider(names_from = module_name, values_from = stepwise_module_completeness) %>% 
+  as.data.frame()
+
+# Combine OTU and GTDB taxonomy into a single identifier for rows
+heatmap_data$OTU_GTDB <- paste(heatmap_data$OTU, heatmap_data$GTDB_taxonomy, sep = "_")
+# Formatting for pheatmap
+KEGGs_for_pheatmap <- heatmap_data %>% 
+  column_to_rownames("OTU_GTDB") %>% 
+  dplyr::select(-OTU, -GTDB_taxonomy) %>% 
+  t() %>% 
+  as.data.frame()
+
+# But I cannot plot NAs... Let's check how many I have:
+any(is.na(KEGGs_for_pheatmap))
+# If any of these checks return TRUE, handle these values appropriately - replacing with a zero:
+KEGGs_for_pheatmap[is.na(KEGGs_for_pheatmap)] <- 0
+# These will now be plotted in grey
+
+# Reorder the columns of KEGGs_for_pheatmap
+loading.plots.rawgraphs.sectors_taxonomy <- left_join(loading.plots.rawgraphs.sectors,
+                                                      KEGG_indicators %>% 
+                                                        dplyr::select(OTU, GTDB_taxonomy) %>% 
+                                                        distinct(OTU, .keep_all = TRUE))
+loading.plots.rawgraphs.sectors_taxonomy$OTU_GTDB <- paste(loading.plots.rawgraphs.sectors_taxonomy$OTU,
+                                                           loading.plots.rawgraphs.sectors_taxonomy$GTDB_taxonomy,
+                                                           sep = "_")
+loading.plots.rawgraphs.sectors_taxonomy <- loading.plots.rawgraphs.sectors_taxonomy %>% 
+  dplyr::select(-OTU, -GTDB_taxonomy) %>% 
+  as.data.frame()
+
+# Extract the order from loading.plots.rawgraphs.sectors_taxonomy
+ordered_pMAGs <- loading.plots.rawgraphs.sectors_taxonomy$OTU_GTDB
+
+# Reorder the columns in KEGGs_for_pheatmap to match the order in ordered_OTUs
+KEGGs_for_pheatmap_ordered <- KEGGs_for_pheatmap[, ordered_pMAGs, drop = FALSE]
+
+# Create a custom color palette
+my_colors <- colorRampPalette(c("snow2", "lightsalmon"))(6) # Color gradient for non-NA values
+my_colors <- c(my_colors, "red4")  # Color complete pathways in red
+
+# Define a color function to handle NA values
+# na_color_function <- function(x) {
+#  colors <- colorRampPalette(c("snow2", "lightsalmon"))(6)
+#  colors <- c(colors, "white")
+#  return(colors[findInterval(x, c(seq(min(x, na.rm = TRUE), max(x, na.rm = TRUE), length.out = 50)), Inf)])
+#W }
+
+# Apply the color function in pheatmap
+pheatmap(
+  as.matrix(KEGGs_for_pheatmap),
+  cluster_cols = FALSE,
+  cluster_rows = TRUE,
+  clustering_distance_rows = "euclidean",
+  clustering_method = "complete",
+  color = my_colors,
+  scale = "none",
+  show_rownames = TRUE,
+  show_colnames = TRUE,
+  fontsize = 10,
+  cellwidth = 15,
+  cellheight = 10,
+  na_col = "white",  # Specify grey for NA values
+  border_color = NA  # Remove cell borders
+)
+```
+
+<!-- ===== FIGURE 5 + SUPPLEMENTARY (S33-S40) CHUNKS — verbatim, in original file order ===== -->
+
+```{r Importing KEGG data, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# Importing our KEGG annotations 
+KEGGs_all_876_95ANI_MAGs <- read.delim("/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/KEGGs_analysis/KEGGs_for_876_MAGs_95ANI_CoverM_Katherine.txt")
+# Adding the GTDB R214 taxonomy:
+# Remove 'IMOS__' prefix from 'genome_name' column
+KEGGs_all_876_95ANI_MAGs$genome_name <- sub('^IMOS__', '', KEGGs_all_876_95ANI_MAGs$genome_name)
+# Remove 'prok_' prefix from 'genome_name' column
+KEGGs_all_876_95ANI_MAGs$genome_name <- sub('prok__', '', KEGGs_all_876_95ANI_MAGs$genome_name)
+
+KEGGs_all_876_95ANI_MAGs_GTDB <- left_join(KEGGs_all_876_95ANI_MAGs, 
+                                           pMAGs_95ANI_phyloseq_CLR_per_sector@tax_table %>% 
+                                             as.data.frame() %>% 
+                                             rownames_to_column("genome_name")
+                                           ) %>% 
+  tidyr::unite(GTDB_taxonomy, Domain, Phylum, Class, Order, Family, Genus, Species, sep = "; ")
+
+# Only selecting the MINT sPLS indicator pMAGs
+KEGG_indicators_MINT_sPLS <- left_join(MINT_sPLS_CheckM_stats %>% 
+                               dplyr::select("OTU", "Overall_GroupContrib"),
+                             KEGGs_all_876_95ANI_MAGs_GTDB,
+                              by = c("OTU" = "genome_name")
+)
+```
+
+```{r Plotting KEGG completeness scores for MINT sPLS indicators, fig.width = 100, fig.height=60, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# Pivot data to have module_name as columns and stepwise_module_completeness as values
+KEGG_indicators_MINT_sPLS_heatmap_data <- KEGG_indicators_MINT_sPLS %>%
+  dplyr::select(OTU, GTDB_taxonomy, module_name, stepwise_module_completeness) %>% # just selecting the columns of interest
+  pivot_wider(names_from = module_name, values_from = stepwise_module_completeness) %>% 
+  as.data.frame()
+
+# Combine OTU and GTDB taxonomy into a single identifier for rows
+KEGG_indicators_MINT_sPLS_heatmap_data$OTU_GTDB <- paste(KEGG_indicators_MINT_sPLS_heatmap_data$OTU,
+                                                         KEGG_indicators_MINT_sPLS_heatmap_data$GTDB_taxonomy,
+                                                         sep = "_")
+# Formatting for pheatmap
+KEGGs_for_pheatmap_MINT_sPLS_indicators <- KEGG_indicators_MINT_sPLS_heatmap_data %>% 
+  column_to_rownames("OTU_GTDB") %>% 
+  dplyr::select(-OTU, -GTDB_taxonomy) %>% 
+  t() %>% 
+  as.data.frame()
+
+# But I cannot plot NAs... Let's check how many I have:
+any(is.na(KEGGs_for_pheatmap_MINT_sPLS_indicators))
+# If any of these checks return TRUE, handle these values appropriately - replacing with a zero:
+KEGGs_for_pheatmap_MINT_sPLS_indicators[is.na(KEGGs_for_pheatmap_MINT_sPLS_indicators)] <- 0
+# These will now be plotted in grey
+
+# Reorder the columns of KEGGs_for_pheatmap
+MINT_sPLS_indicators_KEGG_module_completeness <- left_join(MINT_sPLS_CheckM_stats %>% 
+                                                             dplyr::select("OTU", "Overall_GroupContrib"),
+                                                      KEGG_indicators_MINT_sPLS_heatmap_data %>% 
+                                                        dplyr::select(OTU, GTDB_taxonomy) %>% 
+                                                        distinct(OTU, .keep_all = TRUE))
+MINT_sPLS_indicators_KEGG_module_completeness$OTU_GTDB <- paste(MINT_sPLS_indicators_KEGG_module_completeness$OTU,
+                                                           MINT_sPLS_indicators_KEGG_module_completeness$GTDB_taxonomy,
+                                                           sep = "_")
+MINT_sPLS_indicators_KEGG_module_completeness <- MINT_sPLS_indicators_KEGG_module_completeness %>% 
+  dplyr::select(-OTU, -GTDB_taxonomy) %>% 
+  as.data.frame()
+
+# Extract the order from loading.plots.rawgraphs.sectors_taxonomy
+# heatmap_data_OTU_order <- tidyr::unite(data = heatmap_data_OTU_order,
+#                                       col = OTU_GTDB,
+#                                       OTU, Domain, Phylum, Class, Order, Family, Genus, Species, # Columns to unite
+#                                       sep = "; ",
+#                                       remove = FALSE)
+
+
+ordered_pMAGs_MINT_sPLS <- heatmap_data_OTU_order$OTU_GTDB
+
+# Use gsub to replace "_d_Bacteria" with "; d_Bacteria" and "_d_Archaea" with "; d_Archaea"
+colnames(KEGGs_for_pheatmap_MINT_sPLS_indicators) <- gsub("_d__Bacteria", "; d__Bacteria", colnames(KEGGs_for_pheatmap_MINT_sPLS_indicators))
+colnames(KEGGs_for_pheatmap_MINT_sPLS_indicators) <- gsub("_d__Archaea", "; d__Archaea", colnames(KEGGs_for_pheatmap_MINT_sPLS_indicators))
+
+# Reorder the columns in KEGGs_for_pheatmap to match the order in ordered_OTUs
+KEGGs_for_pheatmap_ordered_MINT_sPLS_Indicators <- KEGGs_for_pheatmap_MINT_sPLS_indicators[, ordered_pMAGs_MINT_sPLS, drop = FALSE]
+
+# Create a custom color palette
+my_colors <- colorRampPalette(c("snow2", "lightsalmon"))(6) # Color gradient for non-NA values
+my_colors <- c(my_colors, "red4")  # Color complete pathways in red
+
+# Define a color function to handle NA values
+# na_color_function <- function(x) {
+#  colors <- colorRampPalette(c("snow2", "lightsalmon"))(6)
+#  colors <- c(colors, "white")
+#  return(colors[findInterval(x, c(seq(min(x, na.rm = TRUE), max(x, na.rm = TRUE), length.out = 50)), Inf)])
+#W }
+
+# Apply the color function in pheatmap
+pheatmap(
+  as.matrix(KEGGs_for_pheatmap_ordered_MINT_sPLS_Indicators),
+  cluster_cols = FALSE,
+  cluster_rows = TRUE,
+  clustering_distance_rows = "euclidean",
+  clustering_method = "complete",
+  color = my_colors,
+  scale = "none",
+  show_rownames = TRUE,
+  show_colnames = TRUE,
+  fontsize = 10,
+  cellwidth = 15,
+  cellheight = 10,
+  na_col = "white",  # Specify grey for NA values
+  border_color = NA  # Remove cell borders
+)
+```
+
+```{r Plotting averaged KEGG completeness scores for MINT sPLS indicators, fig.width = 14, fig.height=45, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# Compute the average KEGG completeness for each sample (column)
+MINT_sPLS_indicators_average_KEGG_completeness_per_MAG <- colMeans(KEGGs_for_pheatmap_ordered_MINT_sPLS_Indicators, na.rm = TRUE) %>% 
+  as.data.frame()
+# Set column names
+colnames(MINT_sPLS_indicators_average_KEGG_completeness_per_MAG) <- "average_KEGG_completeness_per_MAG"
+
+# Scaling the values now:
+scaled_average_KEGG_completeness_per_MAG_MINT_sPLS_indicators <- scale(MINT_sPLS_indicators_average_KEGG_completeness_per_MAG)
+
+# Step 2: Creating the custom color palette
+KEGG_my_colors <- colorRampPalette(c("royalblue4", "white", "indianred4"))(100)
+
+# Apply the color function in pheatmap
+pheatmap(
+  as.matrix(scaled_average_KEGG_completeness_per_MAG_MINT_sPLS_indicators),
+  cluster_cols = FALSE,
+  cluster_rows = FALSE,
+  color = KEGG_my_colors,
+  scale = "none",
+  show_rownames = TRUE,
+  show_colnames = TRUE,
+  na_col = "white",  # Specify grey for NA values
+  border_color = NA  # Remove cell borders
+)
+```
+
+```{r KEGG completeness boxplots, fig.height=3, fig.width=3, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, results='hide', fig.show='hide'}
+# Replace "_d_Bacteria" with "; d_Bacteria" and "_d_Archaea" with "; d_Archaea" in the OTU_GTDB column
+MINT_sPLS_CheckM_stats$OTU_GTDB <- gsub("_d__Bacteria", "; d__Bacteria", MINT_sPLS_CheckM_stats$OTU_GTDB)
+MINT_sPLS_CheckM_stats$OTU_GTDB <- gsub("_d__Archaea", "; d__Archaea", MINT_sPLS_CheckM_stats$OTU_GTDB)
+
+# OK, let's add the average KEGG completeness info into the MINT_sPLS_CheckM_stats object
+MINT_sPLS_CheckM_stats_and_average_KEGG_completeness <- left_join(MINT_sPLS_CheckM_stats,
+                                                               MINT_sPLS_indicators_average_KEGG_completeness_per_MAG %>%
+                                                                  rownames_to_column("OTU_GTDB"))
+KEGG_modules_completeness_stats <- ddply(MINT_sPLS_CheckM_stats_and_average_KEGG_completeness %>% 
+                             column_to_rownames("OTU") %>% 
+                             dplyr::select("Overall_GroupContrib", "average_KEGG_completeness_per_MAG"),
+                           .(Overall_GroupContrib), # summarise based on the group of interest
+                           summarise,
+                           Median_KEGG_completeness = median(average_KEGG_completeness_per_MAG, na.rm = TRUE),
+                           SD_KEGG_completeness = sd(average_KEGG_completeness_per_MAG, na.rm = TRUE))
+
+# Plotting
+MINT_sPLS_CheckM_stats_and_average_KEGG_completeness %>%   
+  ggplot() +
+  geom_boxplot(aes(y = average_KEGG_completeness_per_MAG,
+                   x = Overall_GroupContrib,
+                   fill = Overall_GroupContrib),
+               show.legend = FALSE) + # just fill as in Trip 2
+      geom_jitter(aes(y = average_KEGG_completeness_per_MAG, 
+                  x = Overall_GroupContrib 
+#                  color = Overall_GroupContrib
+),
+              width = 0.2, # adjust width to control the spread of the points
+              size = 1.2,   # adjust size for better visibility
+              alpha = 0.2) + # adjust transparency if needed
+  geom_text(data = KEGG_modules_completeness_stats, 
+            aes(x = Overall_GroupContrib, 
+                y = Median_KEGG_completeness + 0.1, # Adjust y position for visibility
+                label = paste(round(Median_KEGG_completeness, 2), "±", round(SD_KEGG_completeness, 2))),
+            color = "black", 
+            size = 4.5, 
+            vjust = 0) + # Adjust vertical justification as needed
+#  facet_grid(~Sampling_trip) +
+  labs(title="completeness KEGG modules (0-1)",
+       y="KEGG module completeness (0-1)",
+       x="Reef Zoning Status") +
+    scale_fill_manual(values = c("seagreen3", # C for No-take zones
+#                                 "darkgray", # Not_discriminative_in_MINT_sPLS-DA
+                               "steelblue4")) + # O for Take zones
+  scale_y_continuous(limits = c(0, 0.5)) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 12), legend.position = "none") +
+  stat_pvalue_manual(MINT_sPLS_CheckM_stats_and_average_KEGG_completeness %>% 
+                       pairwise_wilcox_test(average_KEGG_completeness_per_MAG ~ Overall_GroupContrib) %>%
+                       add_xy_position())
+```
+
+```{r KEGG completeness barplots, fig.height=30, fig.width=5, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE, results='hide', fig.show='hide'}
+# Plotting GC as barplots!
+MINT_sPLS_CheckM_stats_and_average_KEGG_completeness %>% # five is indicator colors, 23 is genome size
+#  unite(OTU, c(OTU, taxonomy), sep = "; ") %>% # Trying to add taxonomy here but then the ordering deosn't work...
+  ggplot(aes(y=factor(OTU, level = unique(heatmap_data_OTU_order$OTU)), # ordering the same way as the MAGs are ordered in the loading plots
+             x = average_KEGG_completeness_per_MAG,
+             fill = Overall_GroupContrib)) +
+  geom_bar(stat = "identity", show.legend = FALSE) +
+    scale_fill_manual(values = c("seagreen3", # C for No-take zones
+#                                 "darkgray", # Not_discriminative_in_MINT_sPLS-DA
+                               "steelblue4")) + # O for Take zones
+  labs(y = 'MINT sPLS Indicator pMAGs95%ANI',
+       x = "KEGG completenes across 319 modules (0-1)",
+       title = 'KEGG completenes across 319 modules (0-1)') +
+      theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 12), legend.position = "NONE") +
+  theme_bw() +
+  scale_x_continuous(limits = c(0,0.5)) +
+  scale_y_discrete(limits=rev)
+#    scale_x_continuous(limits = c(0, 100)
+```
+
+```{r Pulling out pMAGs containing transporters for uptake of dissolved N, fig.height=40, fig.width=20, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+### We can also select them from the sPLS-DA heatmap on KEGGs
+# KEGG_modules_of_interest_sPLS_DA <- list_KEGG_modules$col.names
+KO_IDs_of_interest <- c(
+  ### Nitrate (NO₃⁻) Transporters (Microbial Specific):
+  # High-affinity ABC transporters:
+  "K15576", # nitrate/nitrite transport system substrate-binding protein (nrtA, nasF, cynA)
+  "K15577", # nitrate/nitrite transport system permease protein (nrtB, nasE, cynB)
+  "K15578", # nrtC, nasD; nitrate/nitrite transport system ATP-binding protein
+  "K15579", # nrtD, cynD; nitrate/nitrite transport system ATP-binding protein
+  
+  # MFS transporters:
+  "K02575", # NRT2, narK, nrtP, nasA; MFS transporter, NNP family, nitrate/nitrite transporter
+  "K10850", #  narT; MFS transporter, NNP family, putative nitrate transporter
+  "K26551", #  NPF1, NRT1; MFS transporter, POT/PTR family, low-affinity nitrate transporter
+  "K26552", #  NPF2, GTR, NRT1; MFS transporter, POT/PTR family, nitrate/chloride/glucosinolate transporter
+  "K26553", #  NPF3, NITR, NRT1; MFS transporter, POT/PTR family, nitrite transporter
+  "K26554", #  NPF7, NRT1; MFS transporter, POT/PTR family, low-affinity nitrate transporter
+  "K26548", #  NPF4, NRT1; MFS transporter, POT/PTR family, nitrate transporter
+  "K26562", #  NPF5, NRT1, NAET; MFS transporter, POT/PTR family, peptide/nitrate/nicotianamine transporter
+  "K26549", #  NPF6, NRT1; MFS transporter, POT/PTR family, nitrate transporter
+  
+  ### Nitrite (NO₂⁻) Transporters:
+  "K02598", # nirC; nitrite transporter
+  
+  ### Ammonium (NH₄⁺) Transporters:
+  "K03320", #  amt, AMT, MEP; ammonium transporter, Amt family
+  "K28059", #  AMF1; MFS transporter, DHA2 family, low affinity ammonium transporter
+  
+  ### Urea Metabolism (Microbial):
+  # Urease:
+  "K01428", # ureA
+  "K01429", # ureB; urease subunit beta [EC:3.5.1.5]
+  "K01430", # ureC
+  # Urea ABC transporter:
+  "K11959", #  urtA; urea transport system substrate-binding protein
+  "K11960", #  urtB; urea transport system permease protein
+  "K11961", #  urtC; urea transport system permease protein
+  "K11962", #  urtD; urea transport system ATP-binding protein
+  "K11963", #  urtE; urea transport system ATP-binding protein
+  
+  ### NH₄⁺ Assimilation:
+  "K01915", # glnA (GSI type) - Dominant in bacteria
+  "K00265", # gltB. glutamate synthase (NADPH) large chain [EC:1.4.1.13]
+  
+  ### Nitrogen Fixation (Core nif):
+  "K02586", # nifD. nitrogenase molybdenum-iron protein alpha chain [EC:1.18.6.1]
+  "K02591", # nifK; nitrogenase molybdenum-iron protein beta chain [EC:1.18.6.1]
+  "K02588", # nifH; nitrogenase iron protein NifH
+  "K02587", # nifE. nitrogenase molybdenum-cofactor synthesis protein NifE
+  
+  ### Denitrification (Complete Pathway):
+  # Nitrate → N₂:
+  "K00370", # narG, narZ, nxrA; nitrate reductase / nitrite oxidoreductase, alpha subunit [EC:1.7.5.1 1.7.99.-]
+  "K00371", # narH, narY, nxrB; nitrate reductase / nitrite oxidoreductase, beta subunit [EC:1.7.5.1 1.7.99.-]
+  "K00374", # narI, narV; nitrate reductase gamma subunit [EC:1.7.5.1 1.7.99.-]
+  "K00362", # nirB. nitrite reductase (NADH) large subunit [EC:1.7.1.15]
+  "K00363", # nirD. nitrite reductase (NADH) small subunit [EC:1.7.1.15]
+  "K00368", # nirK. nitrite reductase (NO-forming) [EC:1.7.2.1]
+  "K00366", # nirA. ferredoxin-nitrite reductase [EC:1.7.7.1]
+  "K04561", # norB. nitric oxide reductase subunit B [EC:1.7.2.5]
+  "K02305", # norC. nitric oxide reductase subunit C
+  "K00376" # nosZ. nitrous-oxide reductase [EC:1.7.2.4]
+  
+  ### Regulatory Genes (Optional):
+  # "K02475", # ntrB (nitrogen regulation)
+  # "K02476", # ntrC
+)
+
+
+### Filtering the dataframe
+# Based on KEGG IDs
+pMAGs_with_KOs_of_interest <- KEGGs_all_876_95ANI_MAGs_GTDB %>%
+  filter(enzyme_hits_in_module %in% KO_IDs_of_interest)
+# Based on KEGG modules
+# pMAGs_with_KEGG_modules_of_interest <- KEGGs_all_876_95ANI_MAGs_GTDB %>%
+#  filter(module_name %in% KEGG_modules_of_interest_sPLS_DA)
+
+### But are these found in our microbial indicators?
+# Only selecting the MINT sPLS indicator pMAGs
+#pMAGs_with_KEGG_modules_of_interest_MINT_sPLS <- left_join(MINT_sPLS_CheckM_stats %>% # MINT sPLS indicators, ordered the same way as in the MINT sPLS heatmap! 
+#                               dplyr::select("OTU", "Overall_GroupContrib"),
+#                               pMAGs_with_KOs_of_interest, # KO IDs of interest
+#                             pMAGs_with_KEGG_modules_of_interest, # KEGG IDs of interest
+#                              by = c("OTU" = "genome_name")
+# )
+
+# Only selecting the MINT sPLS-DA indicator pMAGs
+pMAGs_with_KEGG_modules_of_interest_MINT_sPLS_DA <- left_join(loading.plots.rawgraphs.sectors, # MINT sPLS-DA indicators, ordered the same way as in the MINT sPLS-DA heatmap!
+#                           pMAGs_with_KEGG_modules_of_interest, # KEGG IDs of interest
+                             pMAGs_with_KOs_of_interest, # KO IDs of interest
+                              by = c("OTU" = "genome_name")
+)
+# Create the Overall_GroupContrib column
+pMAGs_with_KEGG_modules_of_interest_MINT_sPLS_DA$Overall_GroupContrib <- apply(pMAGs_with_KEGG_modules_of_interest_MINT_sPLS_DA[, c("X01_Cape_Grenville.GroupContrib", "X02_Princess_Charlotte_bay.GroupContrib", "X03_Cairns.GroupContrib", "X04_Innisfail.GroupContrib", "X05_Townsville.GroupContrib", "X06_Swains.GroupContrib", "X07_Capricorn_Bunker.GroupContrib")], 1, function(row) {
+  # Count the occurrences of "O" and "C"
+  o_count <- sum(row == "O")
+  c_count <- sum(row == "C")
+  
+  # Assign "O" or "C" based on prevalence
+  if (o_count > c_count) {
+    return("O")
+  } else {
+    return("C")
+  }
+})
+# Last thing, checking which KEGG modules I selected:
+unique(pMAGs_with_KEGG_modules_of_interest_MINT_sPLS_DA$module_name)
+```
+
+```{r Heatmap pMAGs containing transporters for uptake of dissolved N, fig.height=40, fig.width=40, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# Ensure GTDB_taxonomy is a factor
+pMAGs_with_KEGG_modules_of_interest_MINT_sPLS_DA <- pMAGs_with_KEGG_modules_of_interest_MINT_sPLS_DA %>%
+  mutate(GTDB_taxonomy = factor(GTDB_taxonomy))
+
+# Get the order of y-axis labels
+y_levels <- levels(pMAGs_with_KEGG_modules_of_interest_MINT_sPLS_DA$GTDB_taxonomy)
+
+# Create color mapping
+y_colors <- pMAGs_with_KEGG_modules_of_interest_MINT_sPLS_DA %>%
+  distinct(GTDB_taxonomy, Overall_GroupContrib) %>%
+  arrange(GTDB_taxonomy) %>%
+  mutate(color = ifelse(Overall_GroupContrib == "O", "steelblue4", "seagreen3")) %>%
+  pull(color)
+
+ggplot(pMAGs_with_KEGG_modules_of_interest_MINT_sPLS_DA,     
+       aes(x = module_name, y = GTDB_taxonomy, 
+           fill = stepwise_module_completeness)) +
+  geom_tile(# aes(color = Overall_GroupContrib),
+            #lwd = 1.5, linetype = 1
+            ) +
+  scale_fill_gradient(low = "white", high = "dodgerblue4") +
+  scale_color_manual(values = c("O" = "steelblue4", "C" = "seagreen3")) +
+  geom_text(aes(label = round(stepwise_module_completeness, 2)), size = 4) +
+  coord_fixed() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 10),
+        axis.text.y = element_text(color = y_colors)) +
+  xlab("Functions for the uptake of dissolved nitrogen")
+```
+
+```{r Pulling out pMAGs containing transporters for uptake of dissolved N viz without modules, fig.height=40, fig.width=12, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+### We can also select them from the sPLS-DA heatmap on KEGGs
+# KEGG_modules_of_interest_sPLS_DA <- list_KEGG_modules$col.names
+KO_IDs_of_interest <- c(
+  ### Nitrate (NO₃⁻) Transporters (Microbial Specific):
+  # High-affinity ABC transporters:
+  "K15576", # nitrate/nitrite transport system substrate-binding protein (nrtA, nasF, cynA)
+  "K15577", # nitrate/nitrite transport system permease protein (nrtB, nasE, cynB)
+  "K15578", # nrtC, nasD; nitrate/nitrite transport system ATP-binding protein
+  "K15579", # nrtD, cynD; nitrate/nitrite transport system ATP-binding protein
+  
+  # MFS transporters:
+  "K02575", # NRT2, narK, nrtP, nasA; MFS transporter, NNP family, nitrate/nitrite transporter
+  "K10850", #  narT; MFS transporter, NNP family, putative nitrate transporter
+  "K26551", #  NPF1, NRT1; MFS transporter, POT/PTR family, low-affinity nitrate transporter
+  "K26552", #  NPF2, GTR, NRT1; MFS transporter, POT/PTR family, nitrate/chloride/glucosinolate transporter
+  "K26553", #  NPF3, NITR, NRT1; MFS transporter, POT/PTR family, nitrite transporter
+  "K26554", #  NPF7, NRT1; MFS transporter, POT/PTR family, low-affinity nitrate transporter
+  "K26548", #  NPF4, NRT1; MFS transporter, POT/PTR family, nitrate transporter
+  "K26562", #  NPF5, NRT1, NAET; MFS transporter, POT/PTR family, peptide/nitrate/nicotianamine transporter
+  "K26549", #  NPF6, NRT1; MFS transporter, POT/PTR family, nitrate transporter
+  
+  ### Nitrite (NO₂⁻) Transporters:
+  "K02598", # nirC; nitrite transporter
+  
+  ### Ammonium (NH₄⁺) Transporters:
+  "K03320", #  amt, AMT, MEP; ammonium transporter, Amt family
+  "K28059", #  AMF1; MFS transporter, DHA2 family, low affinity ammonium transporter
+  
+  ### Urea Metabolism (Microbial):
+  # Urease:
+  "K01428", # ureA
+  "K01429", # ureB; urease subunit beta [EC:3.5.1.5]
+  "K01430", # ureC
+  # Urea ABC transporter:
+  "K11959", #  urtA; urea transport system substrate-binding protein
+  "K11960", #  urtB; urea transport system permease protein
+  "K11961", #  urtC; urea transport system permease protein
+  "K11962", #  urtD; urea transport system ATP-binding protein
+  "K11963", #  urtE; urea transport system ATP-binding protein
+  
+  ### NH₄⁺ Assimilation:
+  "K01915", # glnA (GSI type) - Dominant in bacteria
+  "K00265", # gltB. glutamate synthase (NADPH) large chain [EC:1.4.1.13]
+  
+  ### Nitrogen Fixation (Core nif):
+  "K02586", # nifD. nitrogenase molybdenum-iron protein alpha chain [EC:1.18.6.1]
+  "K02591", # nifK; nitrogenase molybdenum-iron protein beta chain [EC:1.18.6.1]
+  "K02588", # nifH; nitrogenase iron protein NifH
+  "K02587", # nifE. nitrogenase molybdenum-cofactor synthesis protein NifE
+  
+  ### Denitrification (Complete Pathway):
+  # Nitrate → N₂:
+  "K00370", # narG, narZ, nxrA; nitrate reductase / nitrite oxidoreductase, alpha subunit [EC:1.7.5.1 1.7.99.-]
+  "K00371", # narH, narY, nxrB; nitrate reductase / nitrite oxidoreductase, beta subunit [EC:1.7.5.1 1.7.99.-]
+  "K00374", # narI, narV; nitrate reductase gamma subunit [EC:1.7.5.1 1.7.99.-]
+  "K00362", # nirB. nitrite reductase (NADH) large subunit [EC:1.7.1.15]
+  "K00363", # nirD. nitrite reductase (NADH) small subunit [EC:1.7.1.15]
+  "K00368", # nirK. nitrite reductase (NO-forming) [EC:1.7.2.1]
+  "K00366", # nirA. ferredoxin-nitrite reductase [EC:1.7.7.1]
+  "K04561", # norB. nitric oxide reductase subunit B [EC:1.7.2.5]
+  "K02305", # norC. nitric oxide reductase subunit C
+  "K00376" # nosZ. nitrous-oxide reductase [EC:1.7.2.4]
+  
+  ### Regulatory Genes (Optional):
+  # "K02475", # ntrB (nitrogen regulation)
+  # "K02476", # ntrC
+)
+### Filtering the dataframe
+# Based on KEGG IDs
+pMAGs_with_KOs_of_interest <- KEGGs_all_876_95ANI_MAGs_GTDB %>%
+  filter(enzyme_hits_in_module %in% KO_IDs_of_interest)
+# Based on KEGG modules
+# pMAGs_with_KEGG_modules_of_interest <- KEGGs_all_876_95ANI_MAGs_GTDB %>%
+#  filter(module_name %in% KEGG_modules_of_interest_sPLS_DA)
+
+### But are these found in our microbial indicators?
+# Only selecting the MINT sPLS-DA indicator pMAGs
+pMAGs_with_KEGG_modules_of_interest_MINT_sPLS_DA <- left_join(loading.plots.rawgraphs.sectors, # MINT sPLS-DA indicators, ordered the same way as in the MINT sPLS-DA heatmap!
+#                             pMAGs_with_KEGG_modules_of_interest, # KEGG IDs of interest
+                             pMAGs_with_KOs_of_interest, # KO IDs of interest
+                              by = c("OTU" = "genome_name")
+)
+# Create the Overall_GroupContrib column
+pMAGs_with_KEGG_modules_of_interest_MINT_sPLS_DA$Overall_GroupContrib <- apply(pMAGs_with_KEGG_modules_of_interest_MINT_sPLS_DA[, c("X01_Cape_Grenville.GroupContrib", "X02_Princess_Charlotte_bay.GroupContrib", "X03_Cairns.GroupContrib", "X04_Innisfail.GroupContrib", "X05_Townsville.GroupContrib", "X06_Swains.GroupContrib", "X07_Capricorn_Bunker.GroupContrib")], 1, function(row) {
+  # Count the occurrences of "O" and "C"
+  o_count <- sum(row == "O")
+  c_count <- sum(row == "C")
+  
+  # Assign "O" or "C" based on prevalence
+  if (o_count > c_count) {
+    return("O")
+  } else {
+    return("C")
+  }
+})
+
+# First create a lookup table for MAG group contributions
+mag_groups <- pMAGs_with_KEGG_modules_of_interest_MINT_sPLS_DA %>%
+  distinct(OTU, Overall_GroupContrib)
+
+# Prepare the data with consistent coloring
+ko_plot_data <- pMAGs_with_KEGG_modules_of_interest_MINT_sPLS_DA %>%
+  # Get distinct OTU-KO combinations
+  distinct(OTU, enzyme_hits_in_module) %>%
+  
+  # Join with group assignments
+  left_join(mag_groups, by = "OTU") %>%  
+  
+  # Create presence column (1 if KO exists, NA if missing)
+  mutate(present = ifelse(!is.na(enzyme_hits_in_module), 1,
+                          0)) %>% # else
+  
+  # Create color columns
+  mutate(
+    # Zoning color (based only on Overall_GroupContrib)
+    zoning_color = case_when(
+      Overall_GroupContrib == "O" ~ "steelblue4",
+      Overall_GroupContrib == "C" ~ "seagreen3",
+      TRUE ~ "gray90"  # For MAGs without group assignment
+    ),
+    
+    # Gene presence color (independent of zoning)
+    gene_presence_color = case_when(
+      present == 1 ~ "tan3",
+      present == 0 ~ "white",
+      TRUE ~ "white"  # Fallback
+    )
+  )
+
+### Create a named vector for KO labels (ID + description)
+ko_labels <- c(
+  "K15576" = "K15576 | nrtA/nasF/cynA: nitrate/nitrite transport substrate-binding protein",
+  "K15577" = "K15577 | nrtB/nasE/cynB: nitrate/nitrite transport permease protein",
+  "K15578" = "K15578 | nrtC/nasD: nitrate/nitrite transport ATP-binding protein",
+  "K15579" = "K15579 | nrtD/cynD: nitrate/nitrite transport ATP-binding protein",
+  "K02575" = "K02575 | NRT2/narK/nrtP/nasA: MFS nitrate/nitrite transporter (NNP family)",
+  "K10850" = "K10850 | narT: MFS putative nitrate transporter (NNP family)",
+  "K26551" = "K26551 | NPF1/NRT1: MFS low-affinity nitrate transporter (POT/PTR family)",
+  "K26552" = "K26552 | NPF2/GTR/NRT1: MFS nitrate/chloride transporter (POT/PTR family)",
+  "K26553" = "K26553 | NPF3/NITR/NRT1: MFS nitrite transporter (POT/PTR family)",
+  "K26554" = "K26554 | NPF7/NRT1: MFS low-affinity nitrate transporter (POT/PTR family)",
+  "K26548" = "K26548 | NPF4/NRT1: MFS nitrate transporter (POT/PTR family)",
+  "K26562" = "K26562 | NPF5/NRT1/NAET: MFS peptide/nitrate transporter (POT/PTR family)",
+  "K26549" = "K26549 | NPF6/NRT1: MFS nitrate transporter (POT/PTR family)",
+  "K02598" = "K02598 | nirC: nitrite transporter",
+  "K03320" = "K03320 | amt/AMT/MEP: ammonium transporter (Amt family)",
+  "K28059" = "K28059 | AMF1: MFS low affinity ammonium transporter (DHA2 family)",
+  "K01428" = "K01428 | ureA: urease subunit alpha",
+  "K01429" = "K01429 | ureB: urease subunit beta [EC:3.5.1.5]",
+  "K01430" = "K01430 | ureC: urease subunit gamma",
+  "K11959" = "K11959 | urtA: urea transport substrate-binding protein",
+  "K11960" = "K11960 | urtB: urea transport permease protein",
+  "K11961" = "K11961 | urtC: urea transport permease protein",
+  "K11962" = "K11962 | urtD: urea transport ATP-binding protein",
+  "K11963" = "K11963 | urtE: urea transport ATP-binding protein",
+  "K01915" = "K01915 | glnA: glutamine synthetase (GSI type)",
+  "K00265" = "K00265 | gltB: glutamate synthase (NADPH) large chain [EC:1.4.1.13]",
+  "K02586" = "K02586 | nifD: nitrogenase MoFe protein alpha chain [EC:1.18.6.1]",
+  "K02591" = "K02591 | nifK: nitrogenase MoFe protein beta chain [EC:1.18.6.1]",
+  "K02588" = "K02588 | nifH: nitrogenase iron protein",
+  "K02587" = "K02587 | nifE: nitrogenase Mo-cofactor synthesis protein",
+  "K00370" = "K00370 | narG/narZ/nxrA: nitrate reductase alpha subunit [EC:1.7.5.1]",
+  "K00371" = "K00371 | narH/narY/nxrB: nitrate reductase beta subunit [EC:1.7.5.1]",
+  "K00374" = "K00374 | narI/narV: nitrate reductase gamma subunit [EC:1.7.5.1]",
+  "K00362" = "K00362 | nirB: nitrite reductase (NADH) large subunit [EC:1.7.1.15]",
+  "K00363" = "K00363 | nirD: nitrite reductase (NADH) small subunit [EC:1.7.1.15]",
+  "K00368" = "K00368 | nirK: nitrite reductase (NO-forming) [EC:1.7.2.1]",
+  "K00366" = "K00366 | nirA: ferredoxin-nitrite reductase [EC:1.7.7.1]",
+  "K04561" = "K04561 | norB: nitric oxide reductase subunit B [EC:1.7.2.5]",
+  "K02305" = "K02305 | norC: nitric oxide reductase subunit C",
+  "K00376" = "K00376 | nosZ: nitrous-oxide reductase [EC:1.7.2.4]"
+)
+
+### Get the MAG order from loading.plots.rawgraphs.sectors
+mag_order <- loading.plots.rawgraphs.sectors$OTU
+
+### Create the heatmap with ordered MAGs and descriptive labels
+ggplot(ko_plot_data, 
+       aes(x = enzyme_hits_in_module, y = OTU, fill = zoning_color)) +
+  geom_tile(color = "white", linewidth = 0.2) +
+  scale_fill_identity() +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5, size = 8),
+    axis.text.y = element_text(size = 6),
+    panel.grid = element_blank(),
+    panel.spacing = unit(0.1, "lines"),
+#    plot.margin = margin(1, 1, 1, 1, unit = "cm")  # Corrected margin specification
+  ) +
+  labs(x = "KO ID and Description", y = "MAG", title = "Gene Presence") +
+  scale_x_discrete(limits = KO_IDs_of_interest, 
+                   labels = function(x) ko_labels[x]) +
+  scale_y_discrete(limits = rev(mag_order))  # Use the MAG order from loading.plots.rawgraphs.sectors
+```
+
+```{r Preparing the data for sPLS DA with KEGGs, eval=TRUE, message = FALSE, warning=FALSE, echo=FALSE}
+# Preparing my objects for mixOmics: I need samples as rows and features as columns:
+KEGGs_for_mixOmics <- t(KEGGs_for_pheatmap) %>%
+  as.data.frame() %>% 
+  rownames_to_column("OTU_GTDB") %>% 
+  left_join(., loading.plots.rawgraphs.sectors_taxonomy)
+
+# Create the Overall_GroupContrib column
+KEGGs_for_mixOmics$Overall_GroupContrib <- apply(KEGGs_for_mixOmics[, c("X01_Cape_Grenville.GroupContrib",
+                                                                        "X02_Princess_Charlotte_bay.GroupContrib",
+                                                                        "X03_Cairns.GroupContrib",
+                                                                        "X04_Innisfail.GroupContrib",
+                                                                        "X05_Townsville.GroupContrib",
+                                                                        "X06_Swains.GroupContrib",
+                                                                        "X07_Capricorn_Bunker.GroupContrib")], 1, function(row) {
+  # Count the occurrences of "O" and "C"
+  o_count <- sum(row == "O")
+  c_count <- sum(row == "C")
+  
+  # Assign "O" or "C" based on prevalence
+  if (o_count > c_count) {
+    return("O")
+  } else {
+    return("C")
+  }
+})
+
+# View the updated dataframe
+head(KEGGs_for_mixOmics)
+class(KEGGs_for_mixOmics)
+```
+
+```{r sPLS DA Differentially complete KEGG modules between NTMRs and fished reef indicators, eval=TRUE, message = FALSE, warning=FALSE, echo=FALSE}
+keepX_KEGGs <- c(50, 5)
+sPLS_DA_KEGGs <- mixOmics::splsda(X = KEGGs_for_mixOmics[,2:326], # Selecting the 319 KEGG modules
+                                   Y = KEGGs_for_mixOmics$Overall_GroupContrib,
+                                   ncomp = 2,
+                                   keepX = keepX_KEGGs) 
+```
+
+```{r sample plot KEGGs, eval=TRUE, message = FALSE, warning=FALSE, echo=FALSE}
+plotIndiv(sPLS_DA_KEGGs,
+          comp = c(1,2),
+          ind.names = TRUE,
+          group = KEGGs_for_mixOmics$Overall_GroupContrib,
+          ellipse = TRUE,
+          legend=TRUE,
+          col = c("seagreen3", # Closed to fishing
+                            "steelblue4"), # open to fishing
+          legend.title = 'Reef Protection Status',
+#          star = TRUE,
+          title = 'IMOS-MGD MAGs open/closed, sPLS-DA comp 1 - 2')
+```
+
+```{r sPLS-DA heatmap KEGGs open and closed, fig.height=12, fig.width=20, fig.cap="Clustered Image Map of the KEGG modules differentially complete between NTMR and fished-reef microbial indicators. A hierarchical clustering (using Euclidean distance with Complete agglomeration method) based on the completeness scores of KEGG modules (heatmap rows), with indicator pMAGs coloured according to reef protection status (heatmap columns).", eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+cols.open.closed <- c("seagreen3","steelblue4")
+open.closed.cols <- palette(cols.open.closed)[as.numeric(as.factor(KEGGs_for_mixOmics$Overall_GroupContrib))]
+
+cols.open.closed <- c("seagreen3","steelblue4")
+open.closed.cols <- palette(cols.open.closed)[as.numeric(as.factor(KEGGs_for_mixOmics$Overall_GroupContrib))]
+
+list_KEGG_modules <- cim(sPLS_DA_KEGGs,
+    comp = 1,
+#    cutoff = 0.95,
+    col.names = T,
+    margins=c(2, # bottom
+#              37 # right, when I am plotting MAG names
+50
+),
+    keysize = c(1, 0.4),
+transpose = T,
+#    row.sideColors = color.mixo(as.numeric(as.factor(metadata_IMOS_MGD_MAGs$Open_or_Closed_to_fishing))),
+#    row.names = KEGGs_for_mixOmics$OTU_GTDB,
+row.names = F,
+legend = list(color.mixo(as.numeric(as.factor(KEGGs_for_mixOmics$Overall_GroupContrib))),
+              title = "Reef Protection Status"),
+    row.sideColors = open.closed.cols,
+    title = "sPLS-DA, components 1 and 2",
+xlab = "Indicator MAGs",
+ylab = " KEGGs that are differentially abundant in MAGs indicative of No-take and take reefs")
+```
+
+```{r KEGG heatmap showing actual completeness scores, fig.height=22, fig.width=9, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# This is the list of 50 KEGG modules identified as significantly more complete in pMAGs indicating Take reefs
+list_KEGG_modules[["col.names"]]
+# This dataframe contains the actual KEGG module completeness values for each MAG
+KEGGs_for_mixOmics
+# The "rawgraphs_final.sectors" contains the list of indicator MAGs, just adding the GTDB info too:
+subset_KEGGs <- rawgraphs_final.sectors
+subset_KEGGs <- subset_KEGGs %>%
+  tidyr::unite("OTU_GTDB", c("OTU", "Domain", "Phylum", "Class", "Order", "Family", "Genus", "Species"), sep = "; ")
+
+# OK, trying to visualise:
+# Subset the KEGGs_for_mixOmics dataframe
+heatmap_data <- KEGGs_for_mixOmics %>%
+  column_to_rownames("OTU_GTDB") %>%
+  dplyr::select(all_of(list_KEGG_modules[["col.names"]]))  # Select only the relevant KEGG modules
+
+# Convert heatmap_data to a dataframe and reorder rows
+heatmap_data <- as.data.frame(heatmap_data)
+heatmap_data <- heatmap_data[match(KEGGs_for_mixOmics$OTU_GTDB, rownames(heatmap_data)), ]
+
+# Step 2: Define the custom color scale
+# Create a color palette with 10 bins
+# color_palette <- c(
+#  colorRampPalette(c("slategrey", "snow2"))(8),  # Gradient from white to slateblue for 0–0.8
+#  "tan",  # Color for 0.8–0.9
+#  "tan2"  # Color for 0.9–1
+#)
+
+# Create a color palette with 10 bins
+color_palette <- c(
+  colorRampPalette(c("snow2", "tan", "indianred4"))(10))
+
+# Define breaks for the color scale
+breaks <- seq(0, 1, length.out = 11)  # 10 bins (0–0.1, 0.1–0.2, ..., 0.9–1)
+
+# Step 3: Plot the heatmap with custom settings
+pheatmap(heatmap_data,
+         scale = "none",  # Do not scale the data
+         cluster_rows = FALSE,  # Disable row clustering to maintain order
+         cluster_cols = TRUE,  # Cluster columns if desired
+         color = color_palette,  # Use the custom color palette
+         breaks = breaks,  # Define breaks for the color scale
+         show_rownames = FALSE,  # Show row names (OTU_GTDB)
+         show_colnames = TRUE,  # Show column names (KEGG modules)
+         fontsize_row = 8,  # Adjust font size for row labels
+         fontsize_col = 8)  # Adjust font size for column labels
+```
+
+```{r KEGG heatmaps per module category showing actual completeness scores, fig.height=22, fig.width=9, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# Load and prepare data
+heatmap_data <- KEGGs_for_mixOmics %>%
+  column_to_rownames("OTU_GTDB") %>%
+  dplyr::select(all_of(list_KEGG_modules[["col.names"]]), Overall_GroupContrib)
+
+module_info <- KEGGs_all_876_95ANI_MAGs_GTDB %>%
+  dplyr::select(module, module_name, module_category) %>%
+  distinct()
+
+# Function to extract order from taxonomy string
+extract_order <- function(tax_string) {
+  order <- str_extract(tax_string, "o__[^;]+")
+  order <- gsub("o__", "", order)
+  order <- ifelse(is.na(order), "Unknown", order)
+  return(order)
+}
+
+# Create annotation data frame (fixed approach)
+group_annotation <- data.frame(
+  Group = heatmap_data$Overall_GroupContrib,
+  Order = sapply(rownames(heatmap_data), extract_order),
+  row.names = rownames(heatmap_data)  # Preserve the existing row names
+)
+
+# Let's first check how many unique taxonomic orders I have in the indicator taxa:
+unique(group_annotation$Order)
+
+# Define orders enriched in each group based on your text
+ntmr_specific_orders <- c("Pelagibacterales", "TMED127", "Marinisomatales", "SAR86")
+fished_specific_orders <- c("Flavobacteriales","Puniceispirillales", "Pseudomonadales", "Parvibaculales")
+
+# Orders that appear in both groups (will get neutral colors)
+conflict_orders <- c("Poseidoniales")
+
+# Create color assignments
+order_colors <- c(
+  # NTMR-specific orders (green tones)
+  setNames(colorRampPalette(c("seagreen1", # Making sure Pelagibacter stand out
+                              "#1B9E77", "#4DAF4A"))(length(ntmr_specific_orders)), 
+           ntmr_specific_orders),
+  
+  # Fished-specific orders (blue tones)
+  setNames(colorRampPalette(c("steelblue1", # Making sure Flavobacteriales stand out
+                              "skyblue4", "royalblue4"))(length(fished_specific_orders)), 
+           fished_specific_orders),
+  
+  # Neutral colors for orders in both groups
+  setNames(rep("#999999", length(conflict_orders)), conflict_orders),
+  
+  # Neutral colors for all other orders
+  setNames(colorRampPalette(c("#D3D3D3", "#B3B3B3"))(
+    length(setdiff(unique(group_annotation$Order), 
+                  c(ntmr_specific_orders, fished_specific_orders, conflict_orders)))), 
+    setdiff(unique(group_annotation$Order), 
+            c(ntmr_specific_orders, fished_specific_orders, conflict_orders)))
+)
+
+# Define final color scheme
+group_colors <- list(
+  Group = c("C" = "seagreen3", "O" = "steelblue4"),
+  Order = order_colors
+)
+
+# Modified data preparation
+heatmap_data_long <- heatmap_data %>%
+  rownames_to_column("OTU_GTDB") %>%
+  pivot_longer(cols = -c(OTU_GTDB, Overall_GroupContrib), 
+               names_to = "module_name", values_to = "completeness") %>%
+  left_join(module_info, by = "module_name")
+
+# Get consistent MAG order
+consistent_mag_order <- KEGGs_for_mixOmics$OTU_GTDB
+
+# Color settings for heatmap
+color_palette <- colorRampPalette(c("lavender", "tan", "indianred4"))(10)
+breaks <- seq(0, 1, length.out = 11)
+
+# STEP 1: Select top modules ----
+module_completeness <- heatmap_data_long %>%
+  dplyr::group_by(module_name) %>%
+  dplyr::summarise(
+    avg_completeness = mean(completeness, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(avg_completeness))
+
+top_modules <- module_completeness %>%
+  slice_head(n = 50) %>%  # Adjust number as needed
+  pull(module_name)
+
+# Filter for top modules
+top_modules_data <- heatmap_data_long %>%
+  filter(module_name %in% top_modules)
+
+# Modified plotting function with explicit dplyr calls
+plot_module_heatmap <- function(data, category) {
+  heatmap_wide <- data %>%
+    dplyr::select(OTU_GTDB, module, module_name, completeness) %>%
+    mutate(combined_label = paste0(module, ": ", module_name)) %>%
+    pivot_wider(names_from = OTU_GTDB, values_from = completeness) %>%
+    column_to_rownames("combined_label")
+  
+  if (nrow(heatmap_wide) < 2) {
+    message("Skipping ", category, " - insufficient modules")
+    return(NULL)
+  }
+  
+  heatmap_wide <- heatmap_wide[, consistent_mag_order, drop = FALSE]
+  
+  # Adjust font sizes
+  fontsize_row <- ifelse(nrow(heatmap_wide) > 20, 6, 8)
+  
+  pheatmap(
+    heatmap_wide,
+    scale = "none",
+    cluster_rows = TRUE,
+    cluster_cols = FALSE,
+    color = color_palette,
+    breaks = breaks,
+    show_rownames = TRUE,
+    show_colnames = FALSE,
+    fontsize_row = fontsize_row,
+    main = paste0(category, " (", nrow(heatmap_wide), " modules)"),
+    annotation_col = group_annotation,
+    annotation_colors = group_colors,
+    silent = TRUE
+  )$gtable
+}
+
+# STEP 3: Generate and save heatmaps ----
+output_dir <- "/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/KEGGs_analysis/KEGG_heatmaps"
+
+# Create directory if it doesn't exist
+if (!dir.exists(output_dir)) {
+  dir.create(output_dir, recursive = TRUE)
+}
+
+# Split by category and plot
+top_modules_by_category <- split(top_modules_data, top_modules_data$module_category)
+heatmap_grobs <- list()
+
+for (category in names(top_modules_by_category)) {
+  cat("Processing:", category, "\n")
+  grob <- plot_module_heatmap(top_modules_by_category[[category]], category)
+  if (!is.null(grob)) {
+    heatmap_grobs[[category]] <- grob
+    
+    # Save individual PDFs
+    pdf(
+      file = file.path(output_dir, paste0("top_modules_", gsub("/", "_", category), ".pdf")),
+      width = 12, 
+      height = 4 + nrow(top_modules_by_category[[category]])/10  # Dynamic height
+    )
+    grid.draw(grob)
+    dev.off()
+  }
+}
+
+# STEP 4: Save combined heatmap ----
+save_combined_heatmaps <- function(heatmap_list, output_dir) {
+  # Calculate number of modules per category
+  module_counts <- sapply(top_modules_by_category, function(x) length(unique(x$module_name)))
+  
+  # Calculate relative heights based on module counts
+  relative_heights <- module_counts[names(heatmap_list)]
+  total_height <- sum(relative_heights)
+  
+  # Convert to inches (base height + proportional amount)
+  base_height_per_module <- 0.3  # Adjust this value as needed
+  heights_inches <- base_height_per_module * relative_heights
+  
+  # Create layout specification
+  layout_matrix <- matrix(seq_along(heatmap_list), ncol = 1)
+  
+  # Create combined grob with proportional heights
+  combined_grob <- arrangeGrob(
+    grobs = heatmap_list,
+    layout_matrix = layout_matrix,
+    heights = unit(heights_inches, "in")
+  )
+  
+  # Save with dynamic height
+  pdf(file.path(output_dir, "combined_heatmaps_proportional.pdf"), 
+      width = 12, 
+      height = sum(heights_inches) + 2)  # +1 for margin
+    
+  grid.draw(combined_grob)
+  dev.off()
+  
+  cat("Combined heatmaps with proportional sizing saved successfully!\n")
+}
+
+# Execute saving functions with proportional sizing
+save_combined_heatmaps(heatmap_grobs, output_dir)
+```
+
+```{r KEGG module completeness scors NTMRs vs fished reef, fig.height=22, fig.width=9, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+
+## --- Step 0: what does the input look like? ---
+cat("\n=== heatmap_data_long: dims & columns ===\n")
+print(dim(heatmap_data_long))
+print(colnames(heatmap_data_long))
+cat("\nUnique Overall_GroupContrib values:\n")
+print(unique(heatmap_data_long$Overall_GroupContrib))
+cat("\nNumber of top_modules:", length(top_modules), "\n")
+print(head(top_modules))
+
+## --- Step 1: per-module x group summary (median/mean/SD/n) ---
+summary_part <- heatmap_data_long %>%
+  dplyr::filter(module_name %in% top_modules) %>%
+  dplyr::group_by(module_name, module_category, Overall_GroupContrib) %>%
+  dplyr::summarise(
+    Median_Completeness = median(completeness, na.rm = TRUE),
+    Mean_Completeness = mean(completeness, na.rm = TRUE),
+    SD = sd(completeness, na.rm = TRUE),
+    n_MAGs = n(),
+    .groups = "drop"
+  )
+cat("\n=== summary_part: dims & head ===\n")
+print(dim(summary_part))
+print(head(summary_part, 8))
+cat("\nGroup values present in summary_part:\n")
+print(unique(summary_part$Overall_GroupContrib))
+
+## --- Step 2: Wilcoxon test per module ---
+wilcox_part <- heatmap_data_long %>%
+  dplyr::filter(module_name %in% top_modules) %>%
+  dplyr::group_by(module_name) %>%
+  wilcox_test(completeness ~ Overall_GroupContrib) %>%
+  adjust_pvalue(method = "fdr") %>%
+  add_significance()
+cat("\n=== wilcox_part: dims & head ===\n")
+print(dim(wilcox_part))
+print(head(wilcox_part, 8))
+
+## --- Step 3: join + format ---
+module_stats_table <- summary_part %>%
+  left_join(wilcox_part, by = "module_name") %>%
+  mutate(
+    across(c(Median_Completeness, Mean_Completeness, SD), ~round(., 3)),
+    `Completeness (Median ± SD)` = paste0(Median_Completeness, " ± ", round(SD, 2)),
+    `Protection Effect` = case_when(
+      p.adj < 0.001 ~ "***",
+      p.adj < 0.01 ~ "**",
+      p.adj < 0.05 ~ "*",
+      TRUE ~ "ns"
+    )
+  ) %>%
+  dplyr::select(
+    Module = module_name,
+    Category = module_category,
+    `Reef Status` = Overall_GroupContrib,
+    `Completeness (Median ± SD)`,
+    `MAGs (n)` = n_MAGs,
+    `p.adj`,
+    `Protection Effect`
+  ) %>%
+  dplyr::arrange(Category, Module, `Reef Status`)
+
+cat("\n=== module_stats_table (long): dims, columns, head ===\n")
+print(dim(module_stats_table))
+print(colnames(module_stats_table))
+print(head(module_stats_table, 8))
+cat("\n'Reef Status' values (these must match the pivot names below):\n")
+print(unique(module_stats_table$`Reef Status`))
+
+# Save as CSV
+write_csv(module_stats_table, file.path(output_dir, "module_completeness_stats.csv"))
+
+## --- Step 4: pivot to wide ---
+pivoted <- module_stats_table %>%
+  pivot_wider(
+    names_from = `Reef Status`,
+    values_from = c(`Completeness (Median ± SD)`, `MAGs (n)`),
+    names_glue = "{`Reef Status`}_{.value}"
+  )
+cat("\n=== pivoted: columns produced by pivot_wider ===\n")
+print(colnames(pivoted))
+print(head(pivoted, 4))
+
+## --- Step 5: final select ---
+formatted_table <- pivoted %>%
+  dplyr::select(
+    Module,
+    Category,
+    `NTMR_Completeness (Median ± SD)`  = `C_Completeness (Median ± SD)`,
+    `Fished_Completeness (Median ± SD)` = `O_Completeness (Median ± SD)`,
+    `NTMR_MAGs (n)`   = `C_MAGs (n)`,
+    `Fished_MAGs (n)` = `O_MAGs (n)`,
+    `p.adj`,
+    `Protection Effect`
+  ) %>%
+  dplyr::arrange(Category, Module)
+
+cat("\n=== formatted_table: final columns & head ===\n")
+print(colnames(formatted_table))
+print(head(formatted_table, 8))
+
+# Print prettier version
+formatted_table %>%
+  kable(align = "c") %>%
+  kable_styling(
+    bootstrap_options = c("striped", "hover"),
+    full_width = FALSE,
+    font_size = 12
+  ) %>%
+  column_spec(1, bold = TRUE) %>%
+  add_header_above(c(" " = 2, "Completeness" = 2, "MAG Count" = 2, " " = 2))
+```
+
+```{r plotLoadings, fig.height=15, fig.width=15, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+plotLoadings_sPLS_DA_KEGGs <- plotLoadings(sPLS_DA_KEGGs,
+             contrib = "max",
+             method = 'mean',
+             comp=1,
+             legend = TRUE,
+             legend.color = c("seagreen3", # Closed
+                              "steelblue4"), # Open
+#             ndisplay = 60,
+#             name.var = MAGs.name.short,
+             study="all.partial",
+             title="sPLS-DA comp 1"
+#             subtitle = paste("Study",1:4)
+             )
+KEGGs_importance <- plotLoadings_sPLS_DA_KEGGs[["X"]] %>%
+  as.data.frame() %>% 
+  rownames_to_column("module_name") %>% 
+  dplyr::select(module_name)
+```
+
+```{r Pulling out pMAGs containing modules of interest, fig.height=40, fig.width=20, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+### We can also select them from the sPLS-DA heatmap on KEGGs
+KEGG_modules_of_interest_sPLS_DA <- list_KEGG_modules$col.names
+
+### Filtering the dataframe
+# Based on KEGG IDs
+# pMAGs_with_KOs_of_interest <- KEGGs_all_876_95ANI_MAGs_GTDB %>%
+#  filter(enzyme_hits_in_module %in% KO_IDs_of_interest)
+# Based on KEGG modules
+pMAGs_with_KEGG_modules_of_interest <- KEGGs_all_876_95ANI_MAGs_GTDB %>%
+  filter(module_name %in% KEGG_modules_of_interest_sPLS_DA)
+
+### But are these found in our microbial indicators?
+# Only selecting the MINT sPLS indicator pMAGs
+pMAGs_with_KEGG_modules_of_interest_MINT_sPLS <- left_join(MINT_sPLS_CheckM_stats %>% # MINT sPLS indicators, ordered the same way as in the MINT sPLS heatmap! 
+                               dplyr::select("OTU", "Overall_GroupContrib"),
+                             pMAGs_with_KEGG_modules_of_interest, # KEGG IDs of interest
+                              by = c("OTU" = "genome_name")
+)
+
+# Only selecting the MINT sPLS-DA indicator pMAGs
+pMAGs_with_KEGG_modules_of_interest_MINT_sPLS_DA <- left_join(loading.plots.rawgraphs.sectors, # MINT sPLS-DA indicators, ordered the same way as in the MINT sPLS-DA heatmap! 
+                             pMAGs_with_KEGG_modules_of_interest, # KEGG IDs of interest
+                              by = c("OTU" = "genome_name")
+)
+# Create the Overall_GroupContrib column
+pMAGs_with_KEGG_modules_of_interest_MINT_sPLS_DA$Overall_GroupContrib <- apply(pMAGs_with_KEGG_modules_of_interest_MINT_sPLS_DA[, c("X01_Cape_Grenville.GroupContrib", "X02_Princess_Charlotte_bay.GroupContrib", "X03_Cairns.GroupContrib", "X04_Innisfail.GroupContrib", "X05_Townsville.GroupContrib", "X06_Swains.GroupContrib", "X07_Capricorn_Bunker.GroupContrib")], 1, function(row) {
+  # Count the occurrences of "O" and "C"
+  o_count <- sum(row == "O")
+  c_count <- sum(row == "C")
+  
+  # Assign "O" or "C" based on prevalence
+  if (o_count > c_count) {
+    return("O")
+  } else {
+    return("C")
+  }
+})
+# Last thing, checking which KEGG modules I selected:
+unique(pMAGs_with_KEGG_modules_of_interest_MINT_sPLS_DA$module_name)
+```
+
+```{r Visualising presence absence of KEGG ID in the modules of interest across indicator pMAGs, fig.height=8, fig.width=60, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+### Let's see which genes in particular are present in MAGs indicative of No-Take and Take reefs, i.e. these modules should be more complete for the indicators of Take sites:
+
+# Step 1: Prepare the data
+df_split <- pMAGs_with_KEGG_modules_of_interest_MINT_sPLS_DA %>%
+  mutate(enzyme_hits = strsplit(as.character(enzyme_hits_in_module), ",")) %>%
+  unnest(enzyme_hits) %>%
+  dplyr::select(OTU, GTDB_taxonomy, module_name, module_category, enzyme_hits, Overall_GroupContrib, pathwise_module_completeness, stepwise_module_completeness) %>%
+  distinct()
+
+# Step 2: Create a binary presence/absence matrix
+heatmap_data <- df_split %>%
+  mutate(presence = 1) %>%
+  spread(key = enzyme_hits, value = presence, fill = 0)
+
+# Step 3: Reshape the data into long format
+heatmap_data_long <- heatmap_data %>%
+  gather(key = "enzyme", value = "presence",
+         -GTDB_taxonomy, -module_name, -module_category, -OTU, -Overall_GroupContrib, -pathwise_module_completeness, -stepwise_module_completeness) %>%
+  filter(presence == 1)  # Only show presence (optional, but cleans up the plot)
+
+# Step 4: Ensure OTU is ordered as in loading.plots.rawgraphs.sectors$OTU
+# or use heatmap_data_OTU_order$OTU if using MINT sPLS order
+heatmap_data_long$OTU <- factor(heatmap_data_long$OTU, levels = unique(loading.plots.rawgraphs.sectors$OTU))
+
+# Step 5: Map `Overall_GroupContrib` to colors
+heatmap_data_long <- heatmap_data_long %>%
+  mutate(cell_color = case_when(
+    Overall_GroupContrib == "C" ~ "seagreen3",
+    Overall_GroupContrib == "O" ~ "steelblue4",
+#    Overall_GroupContrib == "Not_discriminative_in_MINT_sPLS-DA" ~ "darkgray",
+    TRUE ~ "black"  # Default color
+  ))
+
+### Step 6: Plot the heatmap with a free x scale to adjust facet width based on number of enzymes
+# Reorder the module_name in heatmap_data_long based on KEGG_modules_of_interest_sPLS_DA$module_name
+heatmap_data_long$module_name <- factor(heatmap_data_long$module_name, 
+                                        levels = KEGGs_importance$module_name)
+
+# Now plot with the reordered module names
+ggplot(heatmap_data_long,
+       aes(x = enzyme, 
+           y = OTU,  # y-axis is the ordered OTU
+           fill = cell_color)) +  # Fill color based on Overall_GroupContrib
+  geom_tile(color = NA) +
+  scale_fill_identity() +  # Use the colors directly from cell_color column
+  theme_bw() +
+  
+  # First facet_wrap call: Arrange facets in a single row, ordered by module_name
+  facet_wrap(~module_category + module_name,
+             scales = "free_x",
+             nrow = 1,  # Single row of facets
+             strip.position = "left"
+  ) +
+  
+  # Second facet_grid call: To allow free x and y axis scales
+  facet_grid(~module_category + module_name,
+             scales = "free_x",
+             space = "free") +  # Move facet labels to the left
+             
+  scale_x_discrete(expand = c(0.1, 0.1), drop = TRUE) +  # Ensure consistent x-axis breaks
+  scale_y_discrete(expand = c(0, 0)) +
+  
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 6),  # Rotate x-axis labels for clarity
+        axis.text.y = element_text(size = 8),  # Adjust y-axis text size for readability
+        axis.title = element_text(size = 10),  # Adjust title size
+        strip.text = element_text(size = 10),  # Adjust facet labels (module_name)
+        panel.spacing = unit(1, "lines"),  # Increase space between facets
+        plot.margin = unit(c(1, 1, 1, 1), "lines")  # Add margin to avoid clipping
+  ) + 
+  labs(x = "Enzyme", y = "MAG", fill = "Presence")
+```
+
+```{r facet names on the left Visualising presence absence of KEGG ID in the modules of interest across indicator pMAGs, fig.height=8, fig.width=60, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# Now plot with the reordered module names
+ggplot(heatmap_data_long,
+       aes(x = enzyme, 
+           y = OTU,  # y-axis is the ordered OTU
+           fill = cell_color)) +  # Fill color based on Overall_GroupContrib
+  geom_tile(color = NA) +
+  scale_fill_identity() +  # Use the colors directly from cell_color column
+  theme_bw() +
+  
+  # First facet_wrap call: Arrange facets in a single row, ordered by module_name
+  facet_wrap(~module_name,
+             scales = "free_x",
+             nrow = 1,  # Single row of facets
+             strip.position = "left"
+  ) +
+             
+  scale_x_discrete(expand = c(0.1, 0.1), drop = TRUE) +  # Ensure consistent x-axis breaks
+  scale_y_discrete(expand = c(0, 0)) +
+  
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 6),  # Rotate x-axis labels for clarity
+        axis.text.y = element_text(size = 8),  # Adjust y-axis text size for readability
+        axis.title = element_text(size = 10),  # Adjust title size
+        strip.text = element_text(size = 10),  # Adjust facet labels (module_name)
+        panel.spacing = unit(1, "lines"),  # Increase space between facets
+        plot.margin = unit(c(1, 1, 1, 1), "lines")  # Add margin to avoid clipping
+  ) + 
+  labs(x = "Enzyme", y = "MAG", fill = "Presence")
+```
+
+```{r facet names module category too on the left Visualising presence absence of KEGG ID in the modules of interest across indicator pMAGs, fig.height=8, fig.width=60, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+ggplot(heatmap_data_long,
+       aes(x = enzyme, 
+           y = OTU,  # y-axis is the ordered OTU
+           fill = cell_color)) +  # Fill color based on Overall_GroupContrib
+  geom_tile(color = NA) +
+  scale_fill_identity() +  # Use the colors directly from cell_color column
+  theme_bw() +
+  
+  # Modify facet_wrap to group by module_category and then by module_name
+  facet_wrap(~module_category + module_name,  # Group by module_category first, then module_name
+             scales = "free_x",
+             nrow = 1,  # Single row of facets
+             strip.position = "left"
+  ) +
+             
+  scale_x_discrete(expand = c(0.1, 0.1), drop = TRUE) +  # Ensure consistent x-axis breaks
+  scale_y_discrete(expand = c(0, 0)) +
+  
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 6),  # Rotate x-axis labels for clarity
+        axis.text.y = element_text(size = 8),  # Adjust y-axis text size for readability
+        axis.title = element_text(size = 10),  # Adjust title size
+        strip.text = element_text(size = 10),  # Adjust facet labels (module_name + module_category)
+        panel.spacing = unit(1, "lines"),  # Increase space between facets
+        plot.margin = unit(c(1, 1, 1, 1), "lines")  # Add margin to avoid clipping
+  ) + 
+  labs(x = "Enzyme", y = "MAG", fill = "Presence")
+```
+
+```{r Visualising presence absence of KEGG ID in the modules of interest across indicator pMAGs with taxonomy info as well, fig.height=8, fig.width=21, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# Let's also try to include the info on taxonomy:
+# Extract the taxonomic order from GTDB_taxonomy column
+heatmap_data_long_order <- heatmap_data_long %>%
+  mutate(order = str_split(GTDB_taxonomy, ";") %>%  # Split taxonomy by semicolon
+           sapply(function(x) str_extract(x[grepl("o__", x)], "(?<=o__)[^;]+")))  # Extract order after 'o__'
+
+# Looking at unique orders:
+unique(heatmap_data_long_order$order)
+
+# Plotting:
+ggplot(heatmap_data_long_order,
+       aes(x = enzyme,
+           y = OTU,  # y-axis is the ordered OTU
+           fill = cell_color)) +  # Fill color based on Overall_GroupContrib
+  geom_tile(color = NA) +
+  scale_fill_identity() +  # Use the colors directly from cell_color column
+  theme_bw() +
+  facet_wrap(order ~ module_name, scales = "free_x", nrow = 1, strip.position = "left") +  # Move facet labels to the left
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 8),  # Rotate x-axis labels for clarity
+        axis.text.y = element_text(size = 8),  # Adjust y-axis text size for readability
+        axis.title = element_text(size = 10),  # Adjust title size
+        strip.text = element_text(size = 10),  # Adjust facet labels (module_name)
+        panel.spacing = unit(0.5, "lines")) +  # Adjust space between facets
+  labs(x = "Enzyme", y = "MAG", fill = "Presence")
+```
+
+```{r summary of completeness scores as boxplots, fig.height=65, fig.width=3, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+KEGG_module_completeness_stats <- ddply(heatmap_data_long %>% 
+#                    column_to_rownames("OTU") %>% 
+                    dplyr::select("Overall_GroupContrib", "module_name",
+                                  "pathwise_module_completeness", "stepwise_module_completeness"),
+                  .(Overall_GroupContrib, module_name), # Specify the grouping variable
+                  summarise,
+                  Median_KEGG_module_stepwise_completeness = median(stepwise_module_completeness, na.rm = TRUE),
+                  SD_KEGG_module_stepwise_completeness = sd(stepwise_module_completeness, na.rm = TRUE)
+)
+
+# Plotting
+heatmap_data_long %>%   
+  ggplot() +
+  geom_boxplot(aes(y = stepwise_module_completeness,
+                   x = Overall_GroupContrib,
+                   fill = Overall_GroupContrib),
+               show.legend = FALSE) + # just fill as in Trip 2
+#      geom_jitter(aes(y = stepwise_module_completeness, 
+#                  x = Overall_GroupContrib 
+#),
+#              width = 0.2, # adjust width to control the spread of the points
+#              size = 1.2,   # adjust size for better visibility
+#              alpha = 0.5) + # adjust transparency if needed
+  geom_text(data = KEGG_module_completeness_stats, 
+            aes(x = Overall_GroupContrib, 
+                y = Median_KEGG_module_stepwise_completeness - 0.05, # Adjust y position for visibility
+                label = paste(round(Median_KEGG_module_stepwise_completeness, 2),
+                              "±", round(SD_KEGG_module_stepwise_completeness, 2))),
+            color = "black", 
+            size = 3, 
+            vjust = 0) + # Adjust vertical justification as needed
+  facet_wrap(~module_name, strip.position = "top", ncol = 1) +
+  labs(title="Average completeness across KEGG modules (0-1)",
+       y="KEGG module completeness (stepwise)",
+       x="Reef Zoning Status") +
+    scale_fill_manual(values = c("seagreen3", # C for No-take zones
+#                                 "darkgray", # Not_discriminative_in_MINT_sPLS-DA
+                               "steelblue4")) + # O for Take zones
+  scale_y_continuous(limits = c(0, 1)) +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 12), legend.position = "none") +
+    stat_pvalue_manual(heatmap_data_long %>% 
+                       pairwise_wilcox_test(stepwise_module_completeness ~ Overall_GroupContrib) %>% 
+                       add_xy_position()
+  )
+```
+
+```{r summary of completeness scores in Table format, fig.height=65, fig.width=3, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# First calculate descriptive statistics
+desc_stats <- heatmap_data_long %>%
+  dplyr::group_by(module_name, module_category, Overall_GroupContrib) %>%
+  dplyr::summarise(
+    Median = median(stepwise_module_completeness, na.rm = TRUE),
+    Mean = mean(stepwise_module_completeness, na.rm = TRUE),
+    SD = sd(stepwise_module_completeness, na.rm = TRUE),
+    n = n(),
+    .groups = "drop"
+  )
+
+# Then calculate Wilcoxon tests separately
+wilcox_results <- map_dfr(
+  unique(heatmap_data_long$module_name),
+  function(mod) {
+    dat <- filter(heatmap_data_long, module_name == mod)
+    test <- wilcox.test(stepwise_module_completeness ~ Overall_GroupContrib, data = dat)
+    
+    tibble(
+      module_name = mod,
+      p.value = test$p.value
+    )
+  }
+) %>%
+  mutate(
+    p.adj = p.adjust(p.value, method = "fdr"),
+    Significance = case_when(
+      p.adj < 0.001 ~ "***",
+      p.adj < 0.01 ~ "**",
+      p.adj < 0.05 ~ "*",
+      TRUE ~ "ns"
+    )
+  )
+
+# Combine results
+completeness_table <- desc_stats %>%
+  left_join(wilcox_results, by = "module_name") %>%
+  mutate(
+    `Completeness (Mean ± SD)` = sprintf("%.2f ± %.2f", Mean, SD),
+    `Reef Status` = ifelse(Overall_GroupContrib == "C", "NTMR", "Fished")
+  ) %>%
+  dplyr::select(
+    Module = module_name,
+    Category = module_category,
+    `Reef Status`,
+    `Completeness (Mean ± SD)`,
+    `MAGs (n)` = n,
+    `Adjusted p-value` = p.adj,
+    Significance
+  ) %>%
+  arrange(Category, Module, `Reef Status`)
+
+# Create wide format
+wide_completeness_table <- completeness_table %>%
+  pivot_wider(
+    names_from = `Reef Status`,
+    values_from = c(`Completeness (Mean ± SD)`, `MAGs (n)`)
+#    names_glue = "{Reef Status}_{.value}"
+  )
+
+# Save results
+write_csv(wide_completeness_table, "module_completeness_stats.csv")
+```
+
+```{r summary of completeness scores as a Heatmap, fig.height=65, fig.width=3, eval=TRUE, message = FALSE, warning=FALSE, echo=TRUE}
+# Define color palette and breaks for completeness scores (same as before)
+color_palette <- colorRampPalette(c("lavender", "tan", "indianred4"))(10)
+breaks <- seq(0, 1, length.out = 11)
+
+manual_module_order <- list(
+  "Carbohydrate metabolism" = c(
+    "Pentose phosphate pathway, non-oxidative phase, fructose 6P => ribose 5P", # M00007
+    "Pentose phosphate pathway (Pentose phosphate cycle)", # M00004
+    "Pyruvate oxidation, pyruvate => acetyl-CoA", # M00307
+    "Galactose degradation, Leloir pathway, galactose => alpha-D-glucose-1P", # M00632
+    "Semi-phosphorylative Entner-Doudoroff pathway, gluconate => glycerate-3P", # M00308
+    "UDP-N-acetyl-D-glucosamine biosynthesis, eukaryotes, glucose => UDP-GlcNAc", # M00892
+    "Entner-Doudoroff pathway, glucose-6P => glyceraldehyde-3P + pyruvate", # M00008
+    "Pentose phosphate pathway, oxidative phase, glucose 6P => ribulose 5P", # M00006
+    "Ascorbate biosynthesis, animals, glucose-1P => ascorbate", # M00129
+    "D-Galacturonate degradation (bacteria), D-galacturonate => pyruvate + D-glyceraldehyde 3P", # M00631
+    "D-Glucuronate degradation, D-glucuronate => pyruvate + D-glyceraldehyde 3P", # M00061
+    "Propanoyl-CoA metabolism, propanoyl-CoA => succinyl-CoA", # M00741
+    "Nucleotide sugar biosynthesis, glucose => UDP-glucose" # M00549
+  ),
+  "Amino acid metabolism" = c(
+    "Lysine biosynthesis, AAA pathway, 2-oxoglutarate => 2-aminoadipate => lysine", # M00030
+    "GABA biosynthesis, eukaryotes, putrescine => GABA", # M00135
+    "Proline metabolism", # M00972
+    "Leucine degradation, leucine => acetoacetate + acetyl-CoA", # M00036
+    "Serine biosynthesis, glycerate-3P => serine", # M00020
+    "Methionine biosynthesis, aspartate => homoserine => methionine" # M00017
+  ),
+  "Lipid metabolism" = c(
+    "beta-Oxidation", # M00087
+    "Ketone body biosynthesis, acetyl-CoA => acetoacetate/3-hydroxybutyrate/acetone", # M00088
+    "Fatty acid biosynthesis in mitochondria, fungi", # M00874
+    "Fatty acid biosynthesis, elongation", # M00083
+    "Fatty acid biosynthesis, initiation" # M00082
+  ),
+  "Energy metabolism" = c(
+    "Formaldehyde assimilation, ribulose monophosphate pathway", # M00345
+    "Formaldehyde assimilation, xylulose monophosphate pathway", # M00344
+    "3-Hydroxypropionate bi-cycle", # M00376
+    "C4-dicarboxylic acid cycle, phosphoenolpyruvate carboxykinase type" # M00170
+  ),
+  "Biosynthesis of terpenoids and polyketides" = c(
+    "C10-C20 isoprenoid biosynthesis, bacteria", # M00364
+    "C10-C20 isoprenoid biosynthesis, archaea", # M00365
+    "C10-C20 isoprenoid biosynthesis, plants", # M00366
+    "C10-C20 isoprenoid biosynthesis, non-plant eukaryotes", # M00367
+    "C5 isoprenoid biosynthesis, mevalonate pathway, archaea", # M00849
+    "C5 isoprenoid biosynthesis, mevalonate pathway" # M00095
+  ),
+  "Metabolism of cofactors and vitamins" = c(
+    "Tetrahydrofolate biosynthesis, GTP => THF", # M00126
+    "Pimeloyl-ACP biosynthesis, BioC-BioH pathway, malonyl-ACP => pimeloyl-ACP", # M00572
+    "Siroheme biosynthesis, glutamyl-tRNA => siroheme", # M00846
+    "Cobalamin biosynthesis, cobyrinate a,c-diamide => cobalamin", # M00122
+    "Cobalamin biosynthesis, aerobic, uroporphyrinogen III => precorrin 2 => cobyrinate a,c-diamide", # M00925
+    "Cobalamin biosynthesis, anaerobic, uroporphyrinogen III => sirohydrochlorin => cobyrinate a,c-diamide", # M00924
+    "Menaquinone biosynthesis, chorismate (+ polyprenyl-PP) => menaquinol", # M00116
+    "Phylloquinone biosynthesis, chorismate (+ phytyl-PP) => phylloquinol", # M00932
+    "Tetrahydrofolate biosynthesis, mediated by ribA and trpF, GTP => THF", # M00840
+    "NAD biosynthesis, tryptophan => quinolinate => NAD" # M00912
+  ),
+  "Xenobiotics biodegradation" = c(
+    "Catechol ortho-cleavage, catechol => 3-oxoadipate", # M00568
+    "Phenylacetate degradation, phenylaxetate => acetyl-CoA/succinyl-CoA" # M00878
+  )
+)
+
+# Simplified data preparation
+heatmap_data <- wide_completeness_table %>%
+  # Create long format with proper status labels
+  pivot_longer(
+    cols = c(`Completeness (Mean ± SD)_NTMR`, `Completeness (Mean ± SD)_Fished`),
+    names_to = "Reef_Status",
+    values_to = "Completeness_Label"
+  ) %>%
+  mutate(
+    Reef_Status = ifelse(str_detect(Reef_Status, "NTMR"), "NTMR", "Fished"),
+    # Extract numeric mean for coloring
+    Mean_Completeness = as.numeric(str_extract(Completeness_Label, "^[0-9.]+")),
+    # Ensure significance column is properly formatted
+    Significance = factor(Significance, levels = c("***", "**", "*", "ns"))
+  )
+
+# Apply this ordering to your heatmap_data
+heatmap_data <- heatmap_data %>%
+  mutate(
+    # First ensure categories are ordered correctly
+    Category = factor(Category, levels = names(manual_module_order)),
+    
+    # Then order modules within each category
+    Module = factor(Module, levels = rev(unlist(manual_module_order)))
+  ) %>%
+  # Remove any modules not in our manual ordering
+  filter(Module %in% unlist(manual_module_order))
+
+# Create the heatmap with consistent coloring, and consistent order of modules
+p <- ggplot(heatmap_data, aes(x = Reef_Status, y = Module)) +
+  # Mean completeness tiles (continuous colors)
+  geom_tile(aes(fill = Mean_Completeness), color = "white", linewidth = 0.5) +
+  # Completeness labels
+  geom_text(aes(label = Completeness_Label), 
+            color = "black", size = 3) +
+  
+  # Continuous color scale for completeness
+  scale_fill_gradientn(
+    name = "Mean\nCompleteness",
+    colors = color_palette,
+    values = scales::rescale(breaks),
+    limits = c(0, 1),
+    na.value = "gray90",
+    guide = guide_colorbar(
+      barwidth = unit(0.5, "cm"),
+      barheight = unit(4, "cm"))
+  ) +
+  
+  # NEW: Start new fill scale for significance tiles
+  ggnewscale::new_scale_fill() +
+  
+  # Significance tiles (semi-transparent)
+  geom_tile(aes(x = 3, fill = `Adjusted p-value`), 
+            color = "white", linewidth = 0.5, alpha = 0.3) +
+  
+  # Significance text (on top of tiles)
+  geom_text(aes(x = 3, label = Significance), 
+            color = "black", size = 4, fontface = "bold") +
+  
+  # Color scale for p-values (only need one instance)
+  scale_fill_gradientn(
+    name = "Adjusted\np-value",
+    colors = c("white", "plum1", "plum3", "plum4"),
+    limits = c(0, 0.1),
+    na.value = "white",
+    trans = "reverse",
+    guide = guide_colorbar(
+      barwidth = unit(0.5, "cm"),
+      barheight = unit(4, "cm"))
+  ) +
+  
+  # Faceting and scales
+  facet_grid(Category ~ ., scales = "free_y", space = "free", switch = "y") +
+  scale_x_discrete(limits = c("NTMR", "Fished", "Significance"),
+                  labels = c("NTMR", "Fished", "Significance")) +
+  
+  # Labels and theme
+  labs(
+    x = NULL,
+    y = "KEGG Module",
+    title = "KEGG Module Completeness by Reef Status"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1),
+    strip.text.y = element_text(angle = 0, hjust = 0),
+    panel.spacing = unit(0.2, "lines"),
+    strip.placement = "outside",
+    panel.grid = element_blank(),
+    legend.position = "right",
+    legend.box = "vertical",
+    plot.title = element_text(hjust = 0.5)
+  )
+
+# Save the plot
+ggsave(
+  plot = p,
+  filename = file.path(output_dir, "completeness_heatmap_with_significance.pdf"),
+  width = 11,  # Wider to accommodate extra column
+  height = 6 + length(unique(heatmap_data$Module))*0.25, # Dynamic height
+  units = "in",
+  limitsize = FALSE
+)
+```
