@@ -1,4 +1,3 @@
-
 ---
 title: "Figure 5"
 subtitle: "R code to replicate the analysis"
@@ -197,6 +196,14 @@ knitr::opts_chunk$set(
   fig.path = file.path(output_dir, "knitted_figures/")
 )
 ```
+
+```{r This is where the figures will go}
+output_dir <- "/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/cleaned_code/Figure_5/"
+dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
+setwd(output_dir)                              # for interactive line-by-line running
+knitr::opts_knit$set(root.dir = output_dir)    # for knitting
+```
+
 
 <!-- ===== PREREQUISITE BUILDERS (moved up from lines 16723 & 16745 of the original; code unchanged) ===== -->
 
@@ -1786,4 +1793,75 @@ ggsave(
   units = "in",
   limitsize = FALSE
 )
+```
+
+```{r Extracting what we need for the Source Data file}
+library(writexl); library(dplyr); library(tidyr)
+
+out_dir <- "/home/marko-terzin/Documents/PhD/Thesis/Chapter_3_IMOS-MGD_MAGs/cleaned_code/Source_Data_file_Nature_Communications/Supplementary"
+dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+
+## ============================================================
+## S40: nitrogen KO gene presence across indicator pMAGs
+## ============================================================
+figS40 <- ko_plot_data %>%
+  dplyr::mutate(Zone = dplyr::recode(Overall_GroupContrib, "C" = "NTMR", "O" = "Fished"))
+
+cat("S40 columns:\n"); print(colnames(figS40))
+
+## ============================================================
+## S33–S39: one sheet per module category
+## 350 pMAGs (rows) x that category's modules (cols),
+## values = stepwise module completeness, numeric, rounded to 2 dp, NA -> 0
+## ============================================================
+cat_to_fig <- c(
+  "Carbohydrate metabolism"                    = "S33",
+  "Energy metabolism"                          = "S34",
+  "Lipid metabolism"                           = "S35",
+  "Amino acid metabolism"                      = "S36",
+  "Metabolism of cofactors and vitamins"       = "S37",
+  "Biosynthesis of terpenoids and polyketides" = "S38",
+  "Xenobiotics biodegradation"                 = "S39"
+)
+
+base_tbl <- heatmap_data_long %>%
+  dplyr::mutate(
+    Zone = dplyr::recode(Overall_GroupContrib, "C" = "NTMR", "O" = "Fished"),
+    pMAG = paste(OTU, GTDB_taxonomy, sep = "_"),
+    stepwise_module_completeness = as.numeric(stepwise_module_completeness)  # force numeric
+  ) %>%
+  dplyr::distinct(pMAG, Zone, module_category, module_name, stepwise_module_completeness)
+
+make_category_sheet <- function(cat_name) {
+  df <- base_tbl %>%
+    dplyr::filter(module_category == cat_name) %>%
+    dplyr::select(pMAG, Zone, module_name, stepwise_module_completeness) %>%
+    tidyr::pivot_wider(
+      names_from  = module_name,
+      values_from = stepwise_module_completeness,
+      values_fill = 0
+    ) %>%
+    dplyr::arrange(Zone, pMAG)
+
+  # round all numeric (module) columns to 2 dp; leave pMAG/Zone untouched
+  df <- df %>%
+    dplyr::mutate(dplyr::across(where(is.numeric), ~ round(.x, 2)))
+  df
+}
+
+sheet_list <- list()
+for (cat_name in names(cat_to_fig)) {
+  fig_label <- cat_to_fig[[cat_name]]
+  sheet <- make_category_sheet(cat_name)
+  # safety net: any residual NA in numeric cols -> 0
+  num_cols <- sapply(sheet, is.numeric)
+  sheet[num_cols][is.na(sheet[num_cols])] <- 0
+  sheet_list[[fig_label]] <- sheet
+  cat(fig_label, "-", cat_name, ":", nrow(sheet), "pMAGs x", ncol(sheet) - 2, "modules\n")
+}
+
+sheet_list[["S40"]] <- figS40
+
+write_xlsx(sheet_list, path = file.path(out_dir, "Figure_S33-S40_Source_Data.xlsx"))
+cat("\nWritten:", file.path(out_dir, "Figure_S33-S40_Source_Data.xlsx"), "\n")
 ```
